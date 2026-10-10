@@ -6,6 +6,8 @@ Hyprland does not run under WSL out of the box: WSL has no GPU device node it ca
 compositor lacks the protocols Hyprland needs to run nested. This repository installs a stack that
 works around both.
 
+The aim is to support all major Linux distributions under WSL2. Only Arch Linux works so far.
+
 ## Requirements
 
 - Windows 11 (or Windows 10 with WSLg) and a current WSL: `wsl --update`
