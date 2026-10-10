@@ -1,0 +1,121 @@
+#!/bin/bash
+# hyprland-wsl: run Hyprland under WSL2 and show it in a window on the Windows desktop.
+#
+# WSL has no GPU device node that Hyprland can use, so this stacks:
+#   vgem (virtual DRM device) -> labwc (headless host compositor, software GL)
+#   -> Hyprland (nested, with the patched aquamarine from install.sh)
+#   -> wayvnc (shares the host's screen) -> vncviewer (a normal WSLg window).
+#
+# Closing the viewer window (or Ctrl+C) shuts everything down.
+
+usage() {
+    cat <<'EOF'
+Usage: hyprland-wsl [WIDTHxHEIGHT] [--port N] [--no-viewer]
+
+  WIDTHxHEIGHT   size of the Hyprland screen (default 1600x900)
+  --port N       VNC port on 127.0.0.1 (default 5900)
+  --no-viewer    do not open a viewer window; connect any VNC client yourself
+EOF
+}
+
+case ${1:-} in -h|--help) usage; exit 0 ;; esac
+
+[ "$(id -u)" = 0 ] || exec sudo -- "$0" "$@"
+
+PREFIX=/opt/hyprland-wsl
+AQ_LIB=$PREFIX/aquamarine/lib
+CONF=/etc/hyprland-wsl.conf
+LOG=/tmp/hyprland-wsl
+
+RES=1600x900
+PORT=5900
+VIEWER=1
+while [ $# -gt 0 ]; do
+    case $1 in
+        --no-viewer) VIEWER=0 ;;
+        --port) PORT=$2; shift ;;
+        [0-9]*x[0-9]*) RES=$1 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+die() { echo "hyprland-wsl: $*" >&2; exit 1; }
+
+[ -f $CONF ] || die "$CONF not found; run install.sh first"
+. $CONF
+id "$HYPR_USER" >/dev/null 2>&1 || die "user '$HYPR_USER' from $CONF does not exist"
+[ -e $AQ_LIB/libaquamarine.so ] || die "patched aquamarine not found in $AQ_LIB; run install.sh"
+
+# The patched library has to match the aquamarine that Hyprland was built against.
+built=$(cat $PREFIX/aquamarine/VERSION 2>/dev/null)
+installed=$(pacman -Q aquamarine 2>/dev/null | awk '{print $2}')
+[ "$built" = "$installed" ] || echo "hyprland-wsl: warning: patched aquamarine was built for '$built' but '$installed' is installed; rerun install.sh" >&2
+
+U=$HYPR_USER
+H=$(getent passwd "$U" | cut -d: -f6)
+R=/run/user/$(id -u "$U")
+pgrep -u "$U" -x Hyprland >/dev/null && die "Hyprland is already running for $U"
+
+# A DRM device for buffer allocation. Dumb buffers are refused on render nodes,
+# so the render node path is pointed at the primary node.
+modprobe vgem || die "could not load the vgem kernel module"
+card=
+for c in /sys/class/drm/card[0-9]*; do
+    case $(readlink -f "$c/device") in */vgem) card=$c ;; esac
+done
+[ -n "$card" ] || die "vgem DRM device not found"
+render=$(ls "$card/device/drm" | grep '^renderD' | head -n 1)
+IFS=: read -r major minor < "$card/dev"
+rm -f "/dev/dri/$render"
+mknod "/dev/dri/$render" c "$major" "$minor"
+chmod 666 "/dev/dri/${card##*/}" "/dev/dri/$render"
+
+mkdir -p $LOG "$R"
+chown "$U": "$R" && chmod 700 "$R"
+rm -rf "$R/hypr" "$R"/wayland-* "$R/wayvncctl"
+
+as() { sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLAY XDG_RUNTIME_DIR="$R" HOME="$H" "$@"; }
+wait_for() { for _ in $(seq 150); do "$@" && return 0; sleep 0.1; done; return 1; }
+
+cleanup() {
+    trap - EXIT INT TERM
+    pkill -u "$U" -x Hyprland; sleep 0.5
+    pkill -u "$U" -x wayvnc; pkill -u "$U" -x labwc; pkill -u "$U" -x vncviewer
+}
+trap cleanup EXIT INT TERM
+
+cd "$H" || exit 1
+
+# Host compositor: no decorations, Hyprland's window fills the screen.
+as mkdir -p "$H/.config/hyprland-wsl/labwc"
+as tee "$H/.config/hyprland-wsl/labwc/rc.xml" > /dev/null <<'EOF'
+<?xml version="1.0"?>
+<labwc_config>
+  <core><decoration>client</decoration></core>
+  <windowRules>
+    <windowRule identifier="*" serverDecoration="no"><action name="Maximize"/></windowRule>
+  </windowRules>
+</labwc_config>
+EOF
+
+as WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_LIBINPUT_NO_DEVICES=1 \
+    labwc -C "$H/.config/hyprland-wsl/labwc" > $LOG/labwc.log 2>&1 &
+wait_for test -S "$R/wayland-0" || die "host compositor did not start, see $LOG/labwc.log"
+as WAYLAND_DISPLAY=wayland-0 wlr-randr --output HEADLESS-1 --custom-mode "$RES" > /dev/null 2>&1
+
+as WAYLAND_DISPLAY=wayland-0 LD_LIBRARY_PATH=$AQ_LIB Hyprland > $LOG/hyprland.log 2>&1 &
+HYPR=$!
+wait_for test -S "$R/wayland-1" || die "Hyprland did not start, see $LOG/hyprland.log"
+
+as WAYLAND_DISPLAY=wayland-0 wayvnc 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
+wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
+echo "Hyprland is running at $RES (VNC on 127.0.0.1:$PORT)."
+
+if [ $VIEWER = 1 ]; then
+    # WSLg's X server shows this as an ordinary window on the Windows desktop.
+    [ -S /tmp/.X11-unix/X0 ] || die "WSLg display not found; use --no-viewer and connect a VNC client to 127.0.0.1:$PORT"
+    sudo -u "$U" env DISPLAY=:0 HOME="$H" vncviewer -RemoteResize=0 "127.0.0.1::$PORT" > $LOG/viewer.log 2>&1
+else
+    wait $HYPR
+fi
