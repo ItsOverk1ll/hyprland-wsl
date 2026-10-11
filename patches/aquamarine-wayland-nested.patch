@@ -1,6 +1,6 @@
 Make aquamarine's nested Wayland backend work under a headless wlroots host.
 
-Two changes to src/backend/Wayland.cpp:
+Three changes to src/backend/Wayland.cpp:
 
 1. Flush the output's initial commit as soon as the output is created. Without
    this the commit sits in the client buffer until the host sends an event, and
@@ -11,10 +11,34 @@ Two changes to src/backend/Wayland.cpp:
    a buffer before the ack, which wlroots hosts reject with
    "xdg_surface has never been configured".
 
-Written against aquamarine 0.15.1.
+3. Bind wl_seat, xdg_wm_base and wl_compositor at the version the host offers
+   when that is lower than the one asked for. Older hosts (labwc 0.7 on
+   Ubuntu 24.04, for example) otherwise end the connection with
+   "invalid version for global".
+
+Written against aquamarine 0.15.1; also applies to 0.14.0.
 
 --- a/src/backend/Wayland.cpp
 +++ b/src/backend/Wayland.cpp
+@@ -118,15 +118,15 @@
+ 
+         if (NAME == "wl_seat") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 9, id)));
+-            waylandState.seat = makeShared<CCWlSeat>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_seat_interface, 9));
++            waylandState.seat = makeShared<CCWlSeat>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_seat_interface, std::min(version, 9u)));
+             initSeat();
+         } else if (NAME == "xdg_wm_base") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 6, id)));
+-            waylandState.xdg = makeShared<CCXdgWmBase>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &xdg_wm_base_interface, 6));
++            waylandState.xdg = makeShared<CCXdgWmBase>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &xdg_wm_base_interface, std::min(version, 6u)));
+             initShell();
+         } else if (NAME == "wl_compositor") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 6, id)));
+-            waylandState.compositor = makeShared<CCWlCompositor>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_compositor_interface, 6));
++            waylandState.compositor = makeShared<CCWlCompositor>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_compositor_interface, std::min(version, 6u)));
+         } else if (NAME == "wl_shm") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 1, id)));
+             waylandState.shm = makeShared<CCWlShm>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_shm_interface, 1));
 @@ -183,6 +183,9 @@
      if (backend->ready)
          o->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
@@ -24,11 +48,11 @@ Written against aquamarine 0.15.1.
 +    wl_display_flush(waylandState.display);
      return true;
  }
-
+ 
 @@ -523,9 +526,27 @@
          return;
      }
-
+ 
 -    waylandState.xdgSurface->setConfigure([this](CCXdgSurface* r, uint32_t serial) {
 +    // WSL patch: the toplevel size is only applied after the xdg_surface configure has been acked.
 +    // Emitting state from the toplevel handler makes the consumer commit a buffer before the ack,
@@ -52,12 +76,12 @@ Written against aquamarine 0.15.1.
 +            out->sched.frameReady.emit();
 +        });
      });
-
+ 
      waylandState.xdgToplevel = makeShared<CCXdgToplevel>(waylandState.xdgSurface->sendGetToplevel());
 @@ -538,19 +559,14 @@
      waylandState.xdgToplevel->setWmCapabilities(
          [this](CCXdgToplevel* r, wl_array* arr) { backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: wm_capabilities received", name)); });
-
+ 
 -    waylandState.xdgToplevel->setConfigure([this](CCXdgToplevel* r, int32_t w, int32_t h, wl_array* arr) {
 +    waylandState.xdgToplevel->setConfigure([this, pendingSize](CCXdgToplevel* r, int32_t w, int32_t h, wl_array* arr) {
          backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: configure toplevel with {}x{}", name, w, h));
@@ -74,5 +98,5 @@ Written against aquamarine 0.15.1.
 -        sched.frameReady.emit();
 +        *pendingSize = Hyprutils::Math::Vector2D{(double)w, (double)h};
      });
-
+ 
      waylandState.xdgToplevel->setClose([this](CCXdgToplevel* r) { destroy(); });

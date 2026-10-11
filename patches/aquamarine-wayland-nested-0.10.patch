@@ -1,0 +1,110 @@
+The three fixes of aquamarine-wayland-nested.patch (see there for the explanation),
+for the older layout of src/backend/Wayland.cpp, plus one that only the older
+layout needs:
+
+4. Idle callbacks only run at the end of dispatchEvents(), from a loop that walks
+   the list while callbacks append to it. The loop now works on a copy, also runs
+   what the callbacks queued, and flushes afterwards. Without this the deferred
+   size from fix 2 crashes Hyprland or is never delivered.
+
+Written against aquamarine 0.10.0.
+
+--- a/src/backend/Wayland.cpp
++++ b/src/backend/Wayland.cpp
+@@ -97,15 +97,15 @@
+ 
+         if (NAME == "wl_seat") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 9, id)));
+-            waylandState.seat = makeShared<CCWlSeat>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_seat_interface, 9));
++            waylandState.seat = makeShared<CCWlSeat>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_seat_interface, std::min(version, 9u)));
+             initSeat();
+         } else if (NAME == "xdg_wm_base") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 6, id)));
+-            waylandState.xdg = makeShared<CCXdgWmBase>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &xdg_wm_base_interface, 6));
++            waylandState.xdg = makeShared<CCXdgWmBase>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &xdg_wm_base_interface, std::min(version, 6u)));
+             initShell();
+         } else if (NAME == "wl_compositor") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 6, id)));
+-            waylandState.compositor = makeShared<CCWlCompositor>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_compositor_interface, 6));
++            waylandState.compositor = makeShared<CCWlCompositor>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_compositor_interface, std::min(version, 6u)));
+         } else if (NAME == "wl_shm") {
+             TRACE(backend->log(AQ_LOG_TRACE, std::format("  > binding to global: {} (version {}) with id {}", name, 1, id)));
+             waylandState.shm = makeShared<CCWlShm>((wl_proxy*)wl_registry_bind((wl_registry*)waylandState.registry->resource(), id, &wl_shm_interface, 1));
+@@ -150,6 +150,9 @@
+     if (backend->ready)
+         o->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
+     idleCallbacks.emplace_back([this, o]() { backend->events.newOutput.emit(SP<IOutput>(o)); });
++    // WSL patch: send the output's initial commit now. Otherwise it waits for the host to send
++    // something first, and a headless host with no input devices never does.
++    wl_display_flush(waylandState.display);
+     return true;
+ }
+ 
+@@ -177,10 +180,18 @@
+ 
+     // dispatch frames
+     if (backend->ready) {
+-        for (auto const& f : idleCallbacks) {
+-            f();
++        // WSL patch: callbacks can queue more callbacks, which must not happen to the list
++        // being walked. Those are run too (a few rounds at most) and what they send is
++        // flushed right away, because under a headless host there may be no further event
++        // to trigger the next dispatch.
++        for (int round = 0; round < 8 && !idleCallbacks.empty(); ++round) {
++            const auto callbacks = std::move(idleCallbacks);
++            idleCallbacks.clear();
++            for (auto const& f : callbacks) {
++                f();
++            }
+         }
+-        idleCallbacks.clear();
++        wl_display_flush(waylandState.display);
+     }
+ 
+     return true;
+@@ -473,9 +484,26 @@
+         return;
+     }
+ 
+-    waylandState.xdgSurface->setConfigure([this](CCXdgSurface* r, uint32_t serial) {
++    // WSL patch: the toplevel size is only applied after the xdg_surface configure has been acked.
++    // Emitting state from the toplevel handler makes the consumer commit a buffer before the ack,
++    // which wlroots hosts reject with "xdg_surface has never been configured".
++    auto pendingSize = makeShared<std::optional<Hyprutils::Math::Vector2D>>();
++
++    waylandState.xdgSurface->setConfigure([this, pendingSize](CCXdgSurface* r, uint32_t serial) {
+         backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: configure surface with {}", name, serial));
+         r->sendAckConfigure(serial);
++        if (!pendingSize->has_value())
++            return;
++        const auto SIZE = pendingSize->value();
++        pendingSize->reset();
++        // Queued behind the newOutput callback so the consumer knows the output before its size.
++        backend->idleCallbacks.emplace_back([o = self, SIZE]() {
++            auto out = o.lock();
++            if (!out)
++                return;
++            out->events.state.emit(SStateEvent{.size = SIZE});
++            out->sendFrameAndSetCallback();
++        });
+     });
+ 
+     waylandState.xdgToplevel = makeShared<CCXdgToplevel>(waylandState.xdgSurface->sendGetToplevel());
+@@ -488,15 +516,14 @@
+     waylandState.xdgToplevel->setWmCapabilities(
+         [this](CCXdgToplevel* r, wl_array* arr) { backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: wm_capabilities received", name)); });
+ 
+-    waylandState.xdgToplevel->setConfigure([this](CCXdgToplevel* r, int32_t w, int32_t h, wl_array* arr) {
++    waylandState.xdgToplevel->setConfigure([this, pendingSize](CCXdgToplevel* r, int32_t w, int32_t h, wl_array* arr) {
+         backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: configure toplevel with {}x{}", name, w, h));
+         if (w == 0 || h == 0) {
+             backend->backend->log(AQ_LOG_DEBUG, std::format("Output {}: w/h is 0, sending default hardcoded 1280x720", name));
+             w = 1280;
+             h = 720;
+         }
+-        events.state.emit(SStateEvent{.size = {w, h}});
+-        sendFrameAndSetCallback();
++        *pendingSize = Hyprutils::Math::Vector2D{(double)w, (double)h};
+     });
+ 
+     waylandState.xdgToplevel->setClose([this](CCXdgToplevel* r) { destroy(); });

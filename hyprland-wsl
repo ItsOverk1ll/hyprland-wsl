@@ -45,12 +45,13 @@ die() { echo "hyprland-wsl: $*" >&2; exit 1; }
 [ -f $CONF ] || die "$CONF not found; run install.sh first"
 . $CONF
 id "$HYPR_USER" >/dev/null 2>&1 || die "user '$HYPR_USER' from $CONF does not exist"
-[ -e $AQ_LIB/libaquamarine.so ] || die "patched aquamarine not found in $AQ_LIB; run install.sh"
 
 # The patched library has to match the aquamarine that Hyprland was built against.
 built=$(cat $PREFIX/aquamarine/VERSION 2>/dev/null)
-installed=$(pacman -Q aquamarine 2>/dev/null | awk '{print $2}')
-[ "$built" = "$installed" ] || echo "hyprland-wsl: warning: patched aquamarine was built for '$built' but '$installed' is installed; rerun install.sh" >&2
+SYS_LIB=$(readlink -f "$(ldconfig -p | awk '/libaquamarine\.so\.[0-9]+ / { print $NF; exit }')")
+installed=${SYS_LIB##*/libaquamarine.so.}
+[ "$built" = "$installed" ] && [ -f "$AQ_LIB/${SYS_LIB##*/}" ] ||
+    die "the patched aquamarine is for '$built' but '$installed' is installed; rerun install.sh"
 
 U=$HYPR_USER
 H=$(getent passwd "$U" | cut -d: -f6)
@@ -75,15 +76,43 @@ mkdir -p $LOG "$R"
 chown "$U": "$R" && chmod 700 "$R"
 rm -rf "$R/hypr" "$R"/wayland-* "$R/wayvncctl"
 
-as() { sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLAY XDG_RUNTIME_DIR="$R" HOME="$H" "$@"; }
+# Terminals want a UTF-8 locale; fall back to the one glibc always has.
+LANG=
+for f in /etc/locale.conf /etc/default/locale; do
+    [ -r $f ] && LANG=$(. $f; echo "${LANG:-}") && [ -n "$LANG" ] && break
+done
+case $LANG in *.[Uu][Tt][Ff]*8) ;; *) LANG=C.UTF-8 ;; esac
+
+# TigerVNC's viewer is "vncviewer" on Arch and "xtigervncviewer" on Debian and Ubuntu.
+VNCVIEWER=$(command -v xtigervncviewer || command -v vncviewer)
+
 wait_for() { for _ in $(seq 150); do "$@" && return 0; sleep 0.1; done; return 1; }
 
 cleanup() {
     trap - EXIT INT TERM
     pkill -u "$U" -x Hyprland; sleep 0.5
-    pkill -u "$U" -x wayvnc; pkill -u "$U" -x labwc; pkill -u "$U" -x vncviewer
+    pkill -u "$U" -x wayvnc; pkill -u "$U" -x labwc
+    [ -n "$VNCVIEWER" ] && pkill -u "$U" -x "${VNCVIEWER##*/}"
+    # Where libseat has its built-in backend, Hyprland leaves a helper process behind.
+    pkill -9 -u "$U" -x Hyprland
+    [ -n "${NS:-}" ] && kill "$NS" 2>/dev/null
 }
 trap cleanup EXIT INT TERM
+
+# The compositors run in a private mount namespace, held open by a sleeping process, where:
+# - the patched aquamarine sits on top of the system one. LD_LIBRARY_PATH would not do:
+#   some distros give Hyprland a file capability, and the loader then ignores it.
+# - /tmp/.X11-unix is a fresh directory. WSLg mounts its own there without the sticky bit,
+#   which makes Xwayland setup fail, and older labwc versions then refuse to start.
+mkdir -p /tmp/.X11-unix
+unshare -m --propagation private sh -c '
+    mount --bind "$1" "$2" && mount -t tmpfs -o mode=1777 tmpfs /tmp/.X11-unix &&
+        touch /tmp/.X11-unix/.hyprland-wsl && exec sleep infinity
+' sh "$AQ_LIB/${SYS_LIB##*/}" "$SYS_LIB" &
+NS=$!
+wait_for nsenter -t $NS -m test -e /tmp/.X11-unix/.hyprland-wsl || die "could not set up the mount namespace"
+
+as() { nsenter -t $NS -m --wd="$H" sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLAY XDG_RUNTIME_DIR="$R" HOME="$H" LANG="$LANG" "$@"; }
 
 cd "$H" || exit 1
 
@@ -104,7 +133,7 @@ as WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_LI
 wait_for test -S "$R/wayland-0" || die "host compositor did not start, see $LOG/labwc.log"
 as WAYLAND_DISPLAY=wayland-0 wlr-randr --output HEADLESS-1 --custom-mode "$RES" > /dev/null 2>&1
 
-as WAYLAND_DISPLAY=wayland-0 LD_LIBRARY_PATH=$AQ_LIB Hyprland > $LOG/hyprland.log 2>&1 &
+as WAYLAND_DISPLAY=wayland-0 Hyprland > $LOG/hyprland.log 2>&1 &
 HYPR=$!
 wait_for test -S "$R/wayland-1" || die "Hyprland did not start, see $LOG/hyprland.log"
 
@@ -115,7 +144,8 @@ echo "Hyprland is running at $RES (VNC on 127.0.0.1:$PORT)."
 if [ $VIEWER = 1 ]; then
     # WSLg's X server shows this as an ordinary window on the Windows desktop.
     [ -S /tmp/.X11-unix/X0 ] || die "WSLg display not found; use --no-viewer and connect a VNC client to 127.0.0.1:$PORT"
-    sudo -u "$U" env DISPLAY=:0 HOME="$H" vncviewer -RemoteResize=0 "127.0.0.1::$PORT" > $LOG/viewer.log 2>&1
+    [ -n "$VNCVIEWER" ] || die "no TigerVNC viewer found; use --no-viewer"
+    sudo -u "$U" env DISPLAY=:0 HOME="$H" "$VNCVIEWER" -RemoteResize=0 "127.0.0.1::$PORT" > $LOG/viewer.log 2>&1
 else
     wait $HYPR
 fi
