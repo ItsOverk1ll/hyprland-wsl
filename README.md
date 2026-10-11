@@ -77,6 +77,7 @@ allow it without the question: `HYPRLAND_PPA=1 ./install.sh`.
 ```sh
 hyprland-wsl                    # 1600x900 window
 hyprland-wsl 1920x1080          # another size
+hyprland-wsl 3840x2160 --scale 2    # large screen with everything drawn twice as big
 hyprland-wsl --no-viewer        # no window; connect a VNC client to 127.0.0.1:5900
 hyprland-wsl --port 5901
 ```
@@ -85,7 +86,33 @@ From Windows: `wsl -d <distro> hyprland-wsl`
 
 Closing the viewer window, or Ctrl+C, shuts everything down. Logs are in `/tmp/hyprland-wsl`.
 
-Default keys (main modifier is ALT because Windows keeps the Windows key for itself):
+### Full screen with the whole keyboard, including the Windows key
+
+The window above is shown by WSLg, and Windows handles the Windows key, Alt+Tab and similar
+keys before WSLg sees them. To give Hyprland the whole keyboard, use the launcher on the Windows
+side instead. It starts the session and shows it with a VNC viewer that runs on Windows itself,
+full screen, with the keyboard captured:
+
+```powershell
+.\windows\hyprland-wsl.cmd -Distro <distro>              # full screen at the display's resolution and scale
+.\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
+```
+
+Then switch Hyprland's main modifier to the Windows key, once, inside the distro:
+
+```sh
+hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
+```
+
+- Press **F8** in the viewer for its menu: leave full screen, or quit.
+- Closing the viewer ends the session.
+- The first run downloads TigerVNC's standalone viewer (about 24 MB, checked for a valid
+  signature) to `%LOCALAPPDATA%\hyprland-wsl`. An installed TigerVNC is used instead if present.
+- `-Size 2560x1440`, `-Scale 1.5` and `-Port` override the defaults.
+- A few keys never leave Windows, such as Ctrl+Alt+Del and Win+L.
+
+Default keys (the installed config uses ALT as the main modifier, because the WSLg window
+cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
 
 | Keys | Action |
 | --- | --- |
@@ -133,11 +160,11 @@ Put the distro on an SSD. On a hard disk, package installation inside WSL is man
 ## How it works
 
 ```
-vncviewer (WSLg window on the Windows desktop)
-   └─ wayvnc
-        └─ labwc, headless, software GL
-             └─ Hyprland, nested, with patched aquamarine
-                  └─ your apps
+VNC viewer (a WSLg window, or a viewer on Windows itself)
+   └─ wayvnc ─────────────┐ captures Hyprland, sends input to it
+labwc, headless, software GL
+   └─ Hyprland, nested, with patched aquamarine
+        └─ your apps
 ```
 
 - **vgem** provides a DRM device for buffer allocation. The render node path is pointed at the
@@ -150,13 +177,17 @@ vncviewer (WSLg window on the Windows desktop)
 - The compositors run in a **private mount namespace**. In it the patched aquamarine is mounted
   over the system one (an `LD_LIBRARY_PATH` is ignored on distros that give Hyprland a file
   capability), and `/tmp/.X11-unix` is a fresh directory (WSLg's one makes Xwayland setup fail).
-- **wayvnc** and TigerVNC's viewer get the picture onto the Windows desktop and input back in.
+- **wayvnc** attaches to Hyprland and TigerVNC's viewer shows it, either inside WSL (displayed
+  by WSLg) or on Windows itself. Keyboard and mouse go back the same way.
 
 ## Limitations
 
 - Rendering is on the CPU (llvmpipe). It idles near zero, but animations and blur cost CPU.
-- Keyboard and mouse through the viewer window were tried by hand on Ubuntu 26.04 only.
-- On high-resolution displays the window and its text are small.
+- On Ubuntu 26.04, Hyprland uses about three CPU cores for as long as a viewer is connected,
+  even when nothing moves. Its older Hyprland redraws the screen for every capture. The other
+  distros idle near zero.
+- In the WSLg window on a high-resolution display, things are small unless a larger size and
+  `--scale` are given. The Windows-side launcher picks both from the display.
 - XWayland apps inside Hyprland are untested.
 - The screen size is fixed when the session starts.
 - The patched aquamarine is tied to the distro's aquamarine version. After a system update that

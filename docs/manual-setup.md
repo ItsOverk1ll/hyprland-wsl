@@ -129,18 +129,28 @@ rm -rf "$R/hypr" "$R"/wayland-* "$R/wayvncctl"
 ```sh
 mkdir -p /tmp/.X11-unix
 unshare -m --propagation private sh -c '
-    mount --bind "$1" "$2" && mount -t tmpfs -o mode=1777 tmpfs /tmp/.X11-unix && exec sleep infinity
+    mount --bind "$1" "$2" || exit 1
+    mount --bind /tmp/.X11-unix /run/hyprland-wsl/x11 || exit 1      # keep WSLg sockets reachable
+    mount -t tmpfs -o mode=1777 tmpfs /tmp/.X11-unix || exit 1
+    for s in /run/hyprland-wsl/x11/X*; do                            # mark their display numbers as taken
+        [ -S "$s" ] && touch "/tmp/.X11-unix/${s##*/}" && mount --bind "$s" "/tmp/.X11-unix/${s##*/}"
+    done
+    exec sleep infinity
 ' sh "/opt/hyprland-wsl/aquamarine/lib/${lib##*/}" "$lib" &
 NS=$!
 ```
+
+(`mkdir -p /run/hyprland-wsl/x11` first.)
 
 Everything below that says `in-ns` means: run it as `USER` inside that namespace, with a clean
 environment:
 
 ```sh
 nsenter -t $NS -m --wd=/home/USER sudo -u USER env -u WAYLAND_DISPLAY -u DISPLAY \
-    XDG_RUNTIME_DIR="$R" HOME=/home/USER LANG=C.UTF-8 COMMAND...
+    XDG_RUNTIME_DIR="$R" HOME=/home/USER LANG=C.UTF-8 LP_NUM_THREADS=4 COMMAND...
 ```
+
+`LP_NUM_THREADS` caps the software renderer's threads; see [how-it-works.md](how-it-works.md).
 
 ### 4. The host compositor
 
@@ -174,11 +184,21 @@ in-ns WAYLAND_DISPLAY=wayland-0 Hyprland &
 
 ### 6. VNC and the viewer
 
+wayvnc attaches to Hyprland (`wayland-1`), not to the host:
+
 ```sh
-in-ns WAYLAND_DISPLAY=wayland-0 wayvnc 127.0.0.1 5900 &
+in-ns WAYLAND_DISPLAY=wayland-1 wayvnc 127.0.0.1 5900 &
 ```
 
-The viewer runs outside the namespace, because it needs WSLg's X socket. It is called
+To change Hyprland's scale for this session (Lua config, then `hyprland.conf` versions):
+
+```sh
+hyprctl eval 'hl.monitor({ output = "WAYLAND-1", mode = "3840x2160@60", position = "0x0", scale = 2 })'
+hyprctl keyword monitor WAYLAND-1,3840x2160@60,0x0,2
+```
+
+A viewer on Windows can connect to `127.0.0.1:5900` at this point. The viewer inside WSL runs
+outside the namespace, because it needs WSLg's X socket. It is called
 `vncviewer` on Arch and `xtigervncviewer` on Debian and Ubuntu:
 
 ```sh

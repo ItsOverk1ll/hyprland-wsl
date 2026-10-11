@@ -96,9 +96,26 @@ prevents. Make sure Hyprland was started with `hyprland-wsl` and not directly, r
 Seen with an earlier version of the aquamarine 0.10 patch. Rerun `./install.sh` from a current
 clone.
 
-**The Windows key does nothing**
-Windows handles it before WSL sees it. The installed config uses ALT as the main modifier. If you
-brought your own config, change its main modifier.
+**The Windows key does nothing, or opens the Start menu**
+In the WSLg window, Windows handles that key before WSL sees it; the installed config therefore
+uses ALT as the main modifier. For a real SUPER key, start the session with
+`windows\hyprland-wsl.cmd` (full screen, keyboard captured) and run `hyprland-wsl set-mod SUPER`
+once inside the distro. In the Windows viewer the keyboard is only captured in full screen.
+
+**Stuck in the full-screen viewer**
+Press F8 for the viewer's menu, which can leave full screen or quit.
+
+**Alt+Tab, Alt+F4 or the arrow keys with Alt do nothing inside Hyprland**
+With a launcher from before 2026-10-11 the host compositor kept those shortcuts for itself.
+Update the clone and rerun `./install.sh`.
+
+**High CPU use**
+- Ubuntu 26.04: about three cores while a viewer is connected, even with a still picture. Its
+  Hyprland (0.53) redraws the screen for every VNC capture. Known and not solved; closing the
+  viewer stops it.
+- Any distro, for the first 20 seconds or so after starting: start-up notices are animating.
+- Otherwise the session should idle near zero. If it does not, check which process is busy with
+  `top`, and try a lower `HYPRLAND_WSL_THREADS` (default 4).
 
 **Typing gives the wrong characters**
 Hyprland uses its own keyboard layout, US by default; the Windows layout is not passed through.

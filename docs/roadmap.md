@@ -7,19 +7,24 @@ Where the project stands and what is still to do. Last updated 2026-10-11.
 - Hyprland in a window on the Windows desktop, on Arch, CachyOS, Kali, Ubuntu 26.04 and
   Linux Mint 22.3.
 - One installer for pacman- and apt-based distros, one launcher.
+- Keyboard and mouse. Checked by hand in the WSLg window on Ubuntu, and by a scripted VNC client
+  on Kali, Ubuntu, Mint and CachyOS (Super+Q opens a terminal, typed text arrives).
+- A Windows-side launcher that shows the session with a viewer running on Windows.
+- Screen size and scale can be chosen at launch, up to 3840x2160.
 - Clean shutdown when the viewer is closed.
 
 ## Known gaps
 
 | Gap | Notes |
 | --- | --- |
-| Keyboard and mouse verified on Ubuntu only | Typing, the mouse and opening several terminals work through the viewer on Ubuntu 26.04. The other distros use the same launcher but were not tried by hand. |
-| Small on high-resolution displays | On a 4K display the window and its text are small. Scaling is not handled yet. |
+| Windows key capture is unconfirmed | The Windows-side launcher starts the viewer full screen with system-key capture switched on. That the Windows key really reaches Hyprland has to be confirmed at a real keyboard. |
+| High CPU on Ubuntu 26.04 | About three cores while a viewer is connected. Hyprland 0.53 redraws for every capture. |
 | XWayland apps are unverified | Hyprland reports XWayland starting in the session; no X11 app was run. |
-| Software rendering only | No GPU acceleration. |
+| Software rendering only | No GPU acceleration. How usable 3840x2160 is for more than terminals is unknown. |
 | Fixed screen size | Chosen at launch; resizing the viewer window does not resize Hyprland. |
 | Keyboard layout | Not taken from Windows; has to be set in the Hyprland config. |
 | Start-up notices | Two harmless notices on every start. |
+| No mouse pointer in the captured picture | The viewer draws its own pointer. Whether that looks right in every viewer is unchecked. |
 
 ## To do
 
@@ -32,8 +37,10 @@ Distros:
 
 Testing:
 
-- [x] Real typing and mouse use through the viewer on Ubuntu 26.04
-- [ ] The same on Arch, CachyOS, Kali and Mint, including the window appearing on the desktop
+- [x] Real typing and mouse use through the WSLg window on Ubuntu 26.04
+- [x] Scripted keyboard test through VNC on Kali, Ubuntu, Mint, CachyOS
+- [ ] The Windows key through the Windows-side launcher, at a real keyboard
+- [ ] The WSLg window appearing on the desktop on Arch, CachyOS, Kali and Mint (confirmed on Ubuntu)
 - [ ] An XWayland app
 - [ ] Installing and launching as a non-root user (all tests ran as root)
 - [ ] `git clone` inside the distro, as the README describes
@@ -42,11 +49,14 @@ Testing:
 
 Features:
 
-- [ ] A Windows shortcut or `.cmd` to launch a session
+- [x] A Windows-side launcher (`windows\hyprland-wsl.cmd`)
+- [x] Size and scale for high-resolution displays
+- [ ] Decide the default main modifier: ALT (works everywhere) or SUPER (needs the Windows viewer)
+- [ ] A Start menu or desktop shortcut that runs the Windows-side launcher
 - [ ] One-line install once the repository is public
 - [ ] Resizable screen
-- [ ] Sensible size and scale on high-resolution displays
 - [ ] A starter config shared by all distros
+- [ ] Fix or work around the Ubuntu CPU use (newer Hyprland or wayvnc there)
 - [ ] GPU acceleration, if a route exists
 
 Project:

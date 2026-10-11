@@ -10,11 +10,17 @@
 
 usage() {
     cat <<'EOF'
-Usage: hyprland-wsl [WIDTHxHEIGHT] [--port N] [--no-viewer]
+Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--port N] [--no-viewer]
+       hyprland-wsl set-mod SUPER|ALT
 
   WIDTHxHEIGHT   size of the Hyprland screen (default 1600x900)
+  --scale N      Hyprland's monitor scale, e.g. 2 for a 3840x2160 screen (default: from the config)
   --port N       VNC port on 127.0.0.1 (default 5900)
   --no-viewer    do not open a viewer window; connect any VNC client yourself
+
+  set-mod        change the main modifier in the Hyprland config that install.sh wrote.
+                 SUPER needs a viewer that captures the Windows key (see the README);
+                 ALT works in every viewer.
 EOF
 }
 
@@ -30,10 +36,14 @@ LOG=/tmp/hyprland-wsl
 RES=1600x900
 PORT=5900
 VIEWER=1
+SCALE=
+SETMOD=
 while [ $# -gt 0 ]; do
     case $1 in
         --no-viewer) VIEWER=0 ;;
         --port) PORT=$2; shift ;;
+        --scale) SCALE=$2; shift ;;
+        set-mod) SETMOD=${2:-}; shift ;;
         [0-9]*x[0-9]*) RES=$1 ;;
         *) usage >&2; exit 2 ;;
     esac
@@ -45,6 +55,20 @@ die() { echo "hyprland-wsl: $*" >&2; exit 1; }
 [ -f $CONF ] || die "$CONF not found; run install.sh first"
 . $CONF
 id "$HYPR_USER" >/dev/null 2>&1 || die "user '$HYPR_USER' from $CONF does not exist"
+
+if [ -n "$SETMOD" ]; then
+    case $SETMOD in SUPER|ALT) ;; *) die "set-mod takes SUPER or ALT" ;; esac
+    cfg=$(getent passwd "$HYPR_USER" | cut -d: -f6)/.config/hypr
+    if grep -qs '^local mainMod = "' "$cfg/hyprland.lua"; then
+        sed -i "s/^local mainMod = \"[A-Z]*\".*/local mainMod = \"$SETMOD\"/" "$cfg/hyprland.lua"
+    elif grep -qs '^\$mainMod = ' "$cfg/hyprland.conf"; then
+        sed -i "s/^\\\$mainMod = .*/\$mainMod = $SETMOD/" "$cfg/hyprland.conf"
+    else
+        die "no main modifier line found in $cfg; change it in your config by hand"
+    fi
+    echo "Main modifier is now $SETMOD. It applies from the next start of hyprland-wsl."
+    exit 0
+fi
 
 # The patched library has to match the aquamarine that Hyprland was built against.
 built=$(cat $PREFIX/aquamarine/VERSION 2>/dev/null)
@@ -122,7 +146,12 @@ unshare -m --propagation private sh -c '
 NS=$!
 wait_for nsenter -t $NS -m test -e /tmp/.X11-unix/.hyprland-wsl || die "could not set up the mount namespace"
 
-as() { nsenter -t $NS -m --wd="$H" sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLAY XDG_RUNTIME_DIR="$R" HOME="$H" LANG="$LANG" "$@"; }
+# Mesa's software renderer starts one thread per CPU core. Under WSL that costs far more
+# CPU than it gains (measured: over ten times the CPU for the same frames on 24 cores), so
+# the number is capped. HYPRLAND_WSL_THREADS overrides it.
+THREADS=${HYPRLAND_WSL_THREADS:-4}
+
+as() { nsenter -t $NS -m --wd="$H" sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLAY XDG_RUNTIME_DIR="$R" HOME="$H" LANG="$LANG" LP_NUM_THREADS="$THREADS" "$@"; }
 
 cd "$H" || exit 1
 
@@ -147,7 +176,23 @@ as WAYLAND_DISPLAY=wayland-0 Hyprland > $LOG/hyprland.log 2>&1 &
 HYPR=$!
 wait_for test -S "$R/wayland-1" || die "Hyprland did not start, see $LOG/hyprland.log"
 
-as WAYLAND_DISPLAY=wayland-0 wayvnc 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
+if [ -n "$SCALE" ]; then
+    # Hyprland with a Lua config takes this through "eval", older versions through "keyword".
+    sig=$(ls "$R/hypr" | head -n 1)
+    wait_for test -S "$R/hypr/$sig/.socket.sock"
+    hc() { as HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl "$@"; }
+    if [ -f "$H/.config/hypr/hyprland.lua" ]; then
+        hc eval "hl.monitor({ output = \"WAYLAND-1\", mode = \"$RES@60\", position = \"0x0\", scale = $SCALE })"
+    else
+        hc keyword monitor "WAYLAND-1,$RES@60,0x0,$SCALE"
+    fi > $LOG/scale.log 2>&1
+    grep -q '^ok' $LOG/scale.log || echo "hyprland-wsl: could not set the scale, see $LOG/scale.log" >&2
+fi
+
+# wayvnc attaches to Hyprland itself, not to the host. Keys then reach Hyprland without
+# passing the host's own key bindings (Alt+Tab, Alt+F4, Super+Return and so on), and the
+# host is not made to render for a second observer.
+as WAYLAND_DISPLAY=wayland-1 wayvnc 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
 wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
 echo "Hyprland is running at $RES (VNC on 127.0.0.1:$PORT)."
 

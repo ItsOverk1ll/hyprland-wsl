@@ -17,12 +17,11 @@ nested mode requires. Hyprland stops with "Wayland backend cannot start: Missing
 
 ```
 Windows desktop
-└─ WSLg
-   └─ TigerVNC viewer            an ordinary X11 window
-      └─ wayvnc                  VNC server on 127.0.0.1
-         └─ labwc                headless host compositor, software OpenGL
-            └─ Hyprland          nested in labwc, using the patched aquamarine
-               └─ your apps
+└─ TigerVNC viewer               a WSLg window, or a viewer running on Windows itself
+   └─ wayvnc                     VNC server on 127.0.0.1, attached to Hyprland
+labwc                            headless host compositor, software OpenGL
+└─ Hyprland                      nested in labwc, using the patched aquamarine
+   └─ your apps
 vgem                             virtual DRM device in the WSL kernel
 ```
 
@@ -79,16 +78,41 @@ Nothing outside the session sees either change.
 
 ### wayvnc and the viewer
 
-wayvnc shares labwc's screen over VNC, on localhost only. TigerVNC's viewer connects to it. The
-viewer is an X11 program, and WSLg shows X11 programs as normal windows on the Windows desktop.
-Keyboard and mouse go the other way through the same connection.
+wayvnc shares Hyprland's screen over VNC, on localhost only, and feeds keyboard and mouse back
+into Hyprland as virtual input devices. It attaches to Hyprland rather than to labwc, so keys do
+not pass labwc's own shortcuts on the way (labwc would keep Alt+Tab, Alt+F4, Super+Return and
+others for itself), and labwc has nothing to do while the picture is still.
 
-With `--no-viewer` the launcher skips the viewer, and any VNC client on Windows can connect to
-`127.0.0.1` on the chosen port instead.
+There are two ways to look at it:
+
+- **The WSLg window.** By default the launcher starts TigerVNC's viewer inside WSL. It is an X11
+  program, and WSLg shows X11 programs as normal windows on the Windows desktop. Simple, but
+  Windows handles the Windows key, Alt+Tab and the like before WSLg gets them.
+- **A viewer on Windows.** WSL forwards `127.0.0.1` ports to Windows, so a VNC viewer running
+  on Windows can connect to the same server. In full screen, TigerVNC's Windows viewer captures
+  the whole keyboard, which makes the Windows key usable as Hyprland's SUPER.
+  `windows\hyprland-wsl.ps1` does this: it starts the session with `--no-viewer`, runs the
+  viewer, and ends the session when the viewer closes.
+
+One trap the launcher has to avoid: X servers also listen on a socket name that is shared by
+everything in WSL, across distros and mount namespaces, and X programs try that name first. If one
+of the compositors' own Xwayland servers became display `:0`, the viewer inside WSL would connect
+to it instead of to WSLg and open its window inside the very session it is showing. The launcher
+therefore mounts WSLg's sockets into the private `/tmp/.X11-unix`, so the compositors see `:0` as
+taken and pick another number.
+
+### Software rendering threads
+
+Mesa's software renderer starts one thread per CPU core. Under WSL that turned out to cost far
+more CPU than it gains: on a 24-core machine the same frames took over ten times the CPU with 24
+threads as with one. The launcher caps it at 4 (`LP_NUM_THREADS`); set `HYPRLAND_WSL_THREADS`
+to try another number.
 
 ## What this costs
 
 - Everything is rendered on the CPU. An idle desktop uses next to nothing; animations, blur and
-  video use CPU in proportion to the screen size.
+  video use CPU in proportion to the screen size. The exception is Ubuntu 26.04, whose older
+  Hyprland redraws the screen for every VNC capture and so keeps about three cores busy while a
+  viewer is connected.
 - The picture goes through VNC, which adds some latency and compression.
 - The screen size is fixed when the session starts.
