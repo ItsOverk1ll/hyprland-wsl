@@ -155,7 +155,8 @@ vncviewer (WSLg window on the Windows desktop)
 ## Limitations
 
 - Rendering is on the CPU (llvmpipe). It idles near zero, but animations and blur cost CPU.
-- Keyboard and mouse through the viewer window have not been verified yet.
+- Keyboard and mouse through the viewer window were tried by hand on Ubuntu 26.04 only.
+- On high-resolution displays the window and its text are small.
 - XWayland apps inside Hyprland are untested.
 - The screen size is fixed when the session starts.
 - The patched aquamarine is tied to the distro's aquamarine version. After a system update that

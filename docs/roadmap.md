@@ -13,7 +13,8 @@ Where the project stands and what is still to do. Last updated 2026-10-11.
 
 | Gap | Notes |
 | --- | --- |
-| Keyboard and mouse through the viewer are unverified | The viewer connects and shows the screen. Input was only tested by injecting keys on the host side, on Arch. |
+| Keyboard and mouse verified on Ubuntu only | Typing, the mouse and opening several terminals work through the viewer on Ubuntu 26.04. The other distros use the same launcher but were not tried by hand. |
+| Small on high-resolution displays | On a 4K display the window and its text are small. Scaling is not handled yet. |
 | XWayland apps are unverified | Hyprland reports XWayland starting in the session; no X11 app was run. |
 | Software rendering only | No GPU acceleration. |
 | Fixed screen size | Chosen at launch; resizing the viewer window does not resize Hyprland. |
@@ -31,7 +32,8 @@ Distros:
 
 Testing:
 
-- [ ] Real typing and mouse use through the viewer on every distro
+- [x] Real typing and mouse use through the viewer on Ubuntu 26.04
+- [ ] The same on Arch, CachyOS, Kali and Mint, including the window appearing on the desktop
 - [ ] An XWayland app
 - [ ] Installing and launching as a non-root user (all tests ran as root)
 - [ ] `git clone` inside the distro, as the README describes
@@ -43,6 +45,7 @@ Features:
 - [ ] A Windows shortcut or `.cmd` to launch a session
 - [ ] One-line install once the repository is public
 - [ ] Resizable screen
+- [ ] Sensible size and scale on high-resolution displays
 - [ ] A starter config shared by all distros
 - [ ] GPU acceleration, if a route exists
 
