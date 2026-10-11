@@ -10,12 +10,19 @@
 # Leaving full screen or the session: press F8 in the viewer for its menu.
 # Closing the viewer ends the Hyprland session.
 
+#
+# Full screen on a scaled display (for example 3840x2160 at 150 %): by default Hyprland renders
+# at the size Windows calls 100 % (2560x1440 in that example) and Windows enlarges the picture
+# to fill the screen. Hyprland renders on the CPU, and the full resolution is too many pixels
+# for it to stay smooth. -Native renders every pixel instead: sharper, and much slower.
+
 param(
     [string] $Distro,                  # default: the default WSL distro
-    [string] $Size,                    # WIDTHxHEIGHT; default: the display's resolution (1600x900 with -Windowed)
-    [double] $Scale = 0,               # Hyprland's scale; default: the Windows display scale (1 with -Windowed)
+    [string] $Size,                    # WIDTHxHEIGHT; default: see above (1600x900 with -Windowed)
+    [double] $Scale = 0,               # Hyprland's scale; default 1, or the Windows scale with -Native
     [int]    $Port = 5900,
-    [switch] $Windowed
+    [switch] $Windowed,
+    [switch] $Native                   # full screen at the display's real resolution
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,20 +59,22 @@ function Test-Vnc {
     } catch { return $false } finally { $c.Close() }
 }
 
+$dpi = (Get-ItemProperty 'HKCU:\Control Panel\Desktop\WindowMetrics' -ErrorAction SilentlyContinue).AppliedDPI
+$winScale = if ($dpi) { [math]::Round($dpi / 96 * 4) / 4 } else { 1 }
 if (-not $Size) {
     if ($Windowed) { $Size = '1600x900' }
     else {
         $v = Get-CimInstance Win32_VideoController | Where-Object CurrentHorizontalResolution | Select-Object -First 1
-        $Size = '{0}x{1}' -f $v.CurrentHorizontalResolution, $v.CurrentVerticalResolution
+        $w = $v.CurrentHorizontalResolution; $h = $v.CurrentVerticalResolution
+        if (-not $Native) { $w = [int]($w / $winScale); $h = [int]($h / $winScale) }
+        $Size = '{0}x{1}' -f $w, $h
     }
 }
-if ($Scale -le 0) {
-    if ($Windowed) { $Scale = 1 }
-    else {
-        $dpi = (Get-ItemProperty 'HKCU:\Control Panel\Desktop\WindowMetrics' -ErrorAction SilentlyContinue).AppliedDPI
-        $Scale = if ($dpi) { [math]::Round($dpi / 96 * 4) / 4 } else { 1 }
-    }
-}
+if ($Scale -le 0) { $Scale = if ($Native -and -not $Windowed) { $winScale } else { 1 } }
+
+# TigerVNC's viewer leaves display scaling to Windows, which then enlarges its picture. That is
+# what the default mode relies on. With -Native the viewer is told to use real pixels instead.
+$env:__COMPAT_LAYER = if ($Native) { 'HighDpiAware' } else { 'DpiUnaware' }
 $scaleText = $Scale.ToString([Globalization.CultureInfo]::InvariantCulture)
 
 $viewer = Get-Viewer

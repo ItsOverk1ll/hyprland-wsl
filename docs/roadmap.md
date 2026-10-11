@@ -20,7 +20,7 @@ Where the project stands and what is still to do. Last updated 2026-10-11.
 | Windows key capture is unconfirmed | The Windows-side launcher starts the viewer full screen with system-key capture switched on. That the Windows key really reaches Hyprland has to be confirmed at a real keyboard. |
 | High CPU on Ubuntu 26.04 | About three cores while a viewer is connected. Hyprland 0.53 redraws for every capture. |
 | XWayland apps are unverified | Hyprland reports XWayland starting in the session; no X11 app was run. |
-| Software rendering only | No GPU acceleration. How usable 3840x2160 is for more than terminals is unknown. |
+| Software rendering only | No GPU acceleration. Smooth at 2560x1440 (about 33 updates a second during animations, 18 ms from key press to screen, measured through VNC). At 3840x2160 the renderer is saturated and it lags, so real 4K needs GPU acceleration. Full screen on a 4K display therefore renders at the 100 % size and lets Windows enlarge it. |
 | Fixed screen size | Chosen at launch; resizing the viewer window does not resize Hyprland. |
 | Keyboard layout | Not taken from Windows; has to be set in the Hyprland config. |
 | Start-up notices | Two harmless notices on every start. |

@@ -77,7 +77,7 @@ allow it without the question: `HYPRLAND_PPA=1 ./install.sh`.
 ```sh
 hyprland-wsl                    # 1600x900 window
 hyprland-wsl 1920x1080          # another size
-hyprland-wsl 3840x2160 --scale 2    # large screen with everything drawn twice as big
+hyprland-wsl 2560x1440 --scale 1.25 # larger screen, everything drawn a quarter bigger
 hyprland-wsl --no-viewer        # no window; connect a VNC client to 127.0.0.1:5900
 hyprland-wsl --port 5901
 ```
@@ -94,9 +94,14 @@ side instead. It starts the session and shows it with a VNC viewer that runs on 
 full screen, with the keyboard captured:
 
 ```powershell
-.\windows\hyprland-wsl.cmd -Distro <distro>              # full screen at the display's resolution and scale
+.\windows\hyprland-wsl.cmd -Distro <distro>              # full screen
 .\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
+.\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered (slow at 4K)
 ```
+
+On a scaled display, full screen renders at the size Windows calls 100 % and Windows enlarges
+the picture: a 3840x2160 display at 150 % gets a 2560x1440 Hyprland. That keeps it smooth.
+Rendering all 3840x2160 pixels on the CPU (`-Native`) is sharper but too slow for comfortable use.
 
 Then switch Hyprland's main modifier to the Windows key, once, inside the distro:
 
@@ -183,6 +188,7 @@ labwc, headless, software GL
 ## Limitations
 
 - Rendering is on the CPU (llvmpipe). It idles near zero, but animations and blur cost CPU.
+  Up to about 2560x1440 it is smooth; at 3840x2160 it is not.
 - On Ubuntu 26.04, Hyprland uses about three CPU cores for as long as a viewer is connected,
   even when nothing moves. Its older Hyprland redraws the screen for every capture. The other
   distros idle near zero.

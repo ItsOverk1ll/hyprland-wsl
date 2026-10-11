@@ -9,6 +9,8 @@ It sees and does what a real viewer would: takes screenshots, moves the pointer,
   vnc-probe.py PORT key super+q             press a key combination
   vnc-probe.py PORT type "hello"            type text
   vnc-probe.py PORT hold SECONDS            stay connected, requesting updates (for load tests)
+  vnc-probe.py PORT latency N               time from a key press to the screen changing
+  vnc-probe.py PORT fps SECONDS             screen updates per second (start something moving first)
 
 Several actions can be chained:  vnc-probe.py 5900 key super+q wait 2 shot after.png
 Needs only the Python standard library. No authentication, 127.0.0.1 only.
@@ -124,6 +126,52 @@ def main():
         elif cmd == "type":
             for ch in a.pop(0):
                 v.keysym(ord(ch), True); v.keysym(ord(ch), False); time.sleep(0.03)
+        elif cmd == "latency":
+            # time from a key press to the next screen update, median of N tries
+            times = []
+            v.frame()
+            for _ in range(int(a.pop(0))):
+                time.sleep(0.4)
+                v.s.settimeout(0.3)
+                try:
+                    while True:                      # drain updates that are still on their way
+                        v.frame(incremental=1)
+                except socket.timeout:
+                    pass
+                v.s.settimeout(5)
+                t = time.time()
+                v.keysym(ord("x"), True); v.keysym(ord("x"), False)
+                v.frame(incremental=1)
+                times.append((time.time() - t) * 1000)
+            times.sort()
+            print("key to screen: median %.0f ms, worst %.0f ms" % (times[len(times) // 2], times[-1]))
+        elif cmd == "settle":
+            # after the previous action: how many updates arrive, and for how long, until the
+            # screen has been still for half a second (measures animations)
+            v.frame()
+            t = time.time(); n = 0; last = t
+            v.s.settimeout(0.5)
+            try:
+                while time.time() - t < 15:
+                    v.frame(incremental=1); n += 1; last = time.time()
+            except socket.timeout:
+                pass
+            v.s.settimeout(10)
+            dur = last - t
+            print("settled after %.2f s, %d updates (%.0f per second)" % (dur, n, n / dur if dur > 0 else 0))
+            return
+        elif cmd == "fps":
+            # screen updates per second while something is moving
+            secs = float(a.pop(0)); end = time.time() + secs; n = 0
+            v.frame()
+            try:
+                while time.time() < end:
+                    v.s.settimeout(max(end - time.time(), 0.1))
+                    v.frame(incremental=1); n += 1
+            except socket.timeout:
+                pass
+            print("updates per second: %.1f" % (n / secs))
+            return
         elif cmd == "wait":
             time.sleep(float(a.pop(0)))
         elif cmd == "hold":
