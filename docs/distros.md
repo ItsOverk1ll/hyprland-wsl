@@ -49,6 +49,10 @@ are what the distros shipped that day and will move.
 - No WSL image. The `linuxmintd/mint22.3-amd64` Docker image can be imported (README), but it is
   Mint's package build environment: it identifies as Ubuntu until Mint's base packages are
   installed, and it has no Cinnamon desktop.
+- The image's only regular user is called `ubuntu`, and the installer picks it, so the terminal
+  prompt reads `ubuntu@...` although the system is Mint. To avoid the confusion, install with
+  another user: `HYPR_USER=mint ./install.sh` (the user is created if missing).
+  `cat /etc/os-release` tells you which distro a session really is.
 - Mint 22.x is built on Ubuntu 24.04, which has no Hyprland package. The installer offers the
   third-party PPA `ppa:cppiber/hyprland` and asks first.
 - The PPA also upgrades some system libraries (libinput, libxkbcommon, libdisplay-info).
