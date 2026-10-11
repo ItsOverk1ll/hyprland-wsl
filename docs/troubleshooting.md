@@ -74,6 +74,12 @@ Read that log and Hyprland's own log. Known causes:
 Most likely the port is taken, for example by another session. Use `--port` with a free port.
 All WSL distros share their ports, so two distros cannot both use 5900.
 
+**It says "Hyprland is running" but no window appears on the Windows desktop**
+With a launcher from before 2026-10-11 the viewer opened its window inside the Hyprland session
+instead of on the desktop. Stop the session with Ctrl+C, update the clone, rerun `./install.sh`
+and start again. If it still happens, check `/tmp/hyprland-wsl/viewer.log`, and as a fallback
+start with `--no-viewer` and connect a VNC client on Windows.
+
 **`WSLg display not found`**
 WSLg is not running or not installed. Run `wsl --update`, or start with `--no-viewer` and connect
 a VNC client on Windows to `127.0.0.1:5900`.

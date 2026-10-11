@@ -104,10 +104,20 @@ trap cleanup EXIT INT TERM
 #   some distros give Hyprland a file capability, and the loader then ignores it.
 # - /tmp/.X11-unix is a fresh directory. WSLg mounts its own there without the sticky bit,
 #   which makes Xwayland setup fail, and older labwc versions then refuse to start.
-mkdir -p /tmp/.X11-unix
+#   WSLg's sockets are mounted into the fresh directory, so that the compositors' own
+#   Xwayland servers see those display numbers as taken. Otherwise one of them becomes :0,
+#   and the viewer, which reaches X through a socket name shared by all of WSL, would open
+#   its window inside the session instead of on the Windows desktop.
+mkdir -p /tmp/.X11-unix /run/hyprland-wsl/x11
 unshare -m --propagation private sh -c '
-    mount --bind "$1" "$2" && mount -t tmpfs -o mode=1777 tmpfs /tmp/.X11-unix &&
-        touch /tmp/.X11-unix/.hyprland-wsl && exec sleep infinity
+    mount --bind "$1" "$2" || exit 1
+    mount --bind /tmp/.X11-unix /run/hyprland-wsl/x11 || exit 1
+    mount -t tmpfs -o mode=1777 tmpfs /tmp/.X11-unix || exit 1
+    for s in /run/hyprland-wsl/x11/X*; do
+        [ -S "$s" ] || continue
+        touch "/tmp/.X11-unix/${s##*/}" && mount --bind "$s" "/tmp/.X11-unix/${s##*/}"
+    done
+    touch /tmp/.X11-unix/.hyprland-wsl && exec sleep infinity
 ' sh "$AQ_LIB/${SYS_LIB##*/}" "$SYS_LIB" &
 NS=$!
 wait_for nsenter -t $NS -m test -e /tmp/.X11-unix/.hyprland-wsl || die "could not set up the mount namespace"
