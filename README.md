@@ -8,6 +8,14 @@ works around both.
 
 The aim is to support all major Linux distributions under WSL2.
 
+## Documentation
+
+- [How it works](docs/how-it-works.md): why Hyprland needs help under WSL and what each part does
+- [Distro notes](docs/distros.md): versions and quirks per distro
+- [Setting it up by hand](docs/manual-setup.md): the installer and launcher as individual steps
+- [Troubleshooting](docs/troubleshooting.md): error messages and what to do about them
+- [Status and roadmap](docs/roadmap.md): what works, known gaps, what is planned
+
 ## Supported distros
 
 Tested on 2026-10-11 with WSL 2.5.9:
@@ -147,7 +155,9 @@ vncviewer (WSLg window on the Windows desktop)
 ## Limitations
 
 - Rendering is on the CPU (llvmpipe). It idles near zero, but animations and blur cost CPU.
+- Keyboard and mouse through the viewer window have not been verified yet.
 - XWayland apps inside Hyprland are untested.
+- The screen size is fixed when the session starts.
 - The patched aquamarine is tied to the distro's aquamarine version. After a system update that
   changes Hyprland or aquamarine, the launcher says so; rerun `./install.sh` to rebuild. Patches
   exist for aquamarine 0.10.0, 0.14.0 and 0.15.1; for other versions the installer reports
