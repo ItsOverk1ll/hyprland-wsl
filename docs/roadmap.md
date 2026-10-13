@@ -5,8 +5,9 @@ Where the project stands and what is still to do. Last updated 2026-10-13.
 ## Works
 
 Checked on Arch, CachyOS, Kali and Mint with clean installs on 2026-10-13, by scripts (a VNC
-client, `hyprctl`, screenshots). The owner then used Kali and Arch through the Windows viewer
-the same day: it looks right, keyboard and tiling work, and Arch felt "super smooth". Everything
+client, `hyprctl`, screenshots). The owner then used all four through the Windows viewer the
+same day: it looks right, keyboard and tiling work, Arch felt "super smooth", and CachyOS and
+Mint "both work great". Everything
 below holds on Arch, CachyOS, Kali, and on Mint once Mesa has been upgraded (the installer
 offers that).
 
@@ -46,8 +47,8 @@ Also tried on Ubuntu 26.04, from a side-by-side build: starts on GPU and CPU.
 
 Next:
 
-- [x] Someone looks at it in the Windows viewer (Kali and Arch, 2026-10-13)
-- [ ] Still unseen: the WSLg window, CachyOS and Mint, and the Windows key as modifier
+- [x] Someone looks at it in the Windows viewer (Kali, Arch, CachyOS and Mint, 2026-10-13)
+- [ ] Still unseen: the WSLg window, and the Windows key as modifier
 - [x] Rerun Arch, CachyOS and Mint with this version
 - [x] Mint on the GPU: works with Mesa 26 from the kisak-mesa PPA, offered by the installer
 - [ ] Rewrite `manual-setup.md` and `troubleshooting.md`
