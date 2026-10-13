@@ -62,6 +62,43 @@ add_ppa() {
     apt-cache show hyprland >/dev/null 2>&1 || die "the PPA did not provide a hyprland package"
 }
 
+# Rendering on the GPU needs Mesa 26 or newer: with Mesa 25.2 (Ubuntu 24.04, Linux Mint 22.x)
+# the viewer stays blank, and the launcher then falls back to the CPU. The third-party
+# kisak-mesa PPA has a current Mesa for those releases; it is only added with the user's consent.
+newer_mesa() {
+    local ppa=kisak/kisak-mesa series=${UBUNTU_CODENAME:-} answer=${HYPRLAND_MESA_PPA:-} fp mesa pkgs
+    local url=https://ppa.launchpadcontent.net/$ppa/ubuntu
+    [ -e /dev/dxg ] || return 0
+    mesa=$(ls /usr/lib/*/libgallium-*.so 2>/dev/null | sed -n 's/.*libgallium-\([0-9]*\)\..*/\1/p' | sort -n | tail -n 1)
+    [ "${mesa:-0}" -lt 26 ] || return 0
+    [ -n "$series" ] && curl -fsI "$url/dists/$series/Release" >/dev/null 2>&1 || {
+        echo "Mesa ${mesa:-?} is too old for GPU rendering and no newer one is known for this release; Hyprland will render on the CPU."
+        return 0
+    }
+    echo "Mesa ${mesa:-?} is too old for GPU rendering; Hyprland would render on the CPU."
+    echo "The third-party PPA ppa:$ppa (not part of $NAME, not checked by this project) provides a current Mesa."
+    if [ -z "$answer" ] && [ -t 0 ]; then
+        read -r -p "Add that PPA and upgrade Mesa from it? [y/N] " answer
+    fi
+    case $answer in
+        1|y|Y|yes) ;;
+        *) echo "Not adding it. Rerun with HYPRLAND_MESA_PPA=1 to allow it."; return 0 ;;
+    esac
+    fp=$(curl -fsSL "https://api.launchpad.net/1.0/~${ppa%/*}/+archive/ubuntu/${ppa#*/}" |
+        sed -n 's/.*"signing_key_fingerprint": "\([0-9A-F]*\)".*/\1/p')
+    [ -n "$fp" ] || die "could not look up the Mesa PPA's signing key"
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$fp" -o /etc/apt/keyrings/hyprland-wsl-mesa.asc
+    echo "deb [signed-by=/etc/apt/keyrings/hyprland-wsl-mesa.asc] $url $series main" \
+        > /etc/apt/sources.list.d/hyprland-wsl-mesa.list
+    apt-get update
+    # Only Mesa's own packages are moved to the PPA's version, not everything it carries.
+    pkgs=$(dpkg-query -W -f='${binary:Package}\n' 'libgl1-mesa-dri*' 'libegl-mesa0*' 'libgbm1*' 'libgbm-dev*' \
+        'libglx-mesa0*' 'libglapi-mesa*' 'mesa-*' 'libegl1-mesa-dev*' 2>/dev/null | sort -u || true)
+    [ -n "$pkgs" ] || die "found no installed Mesa packages to upgrade"
+    apt-get install -y --no-install-recommends $pkgs
+}
+
 # A root filesystem imported from a hand-made tarball can end up with / readable by root only.
 # Nothing then works for a regular user, and the failure shows up far from its cause.
 if [ "$(stat -c %a /)" = 700 ]; then
@@ -91,6 +128,7 @@ debian)
         hyprwayland-scanner libhyprutils-dev libwayland-dev wayland-protocols libseat-dev \
         libinput-dev libpixman-1-dev libdrm-dev libgbm-dev libudev-dev libdisplay-info-dev \
         hwdata libegl-dev libgles-dev libgl-dev libopengl-dev
+    newer_mesa
     ;;
 esac
 

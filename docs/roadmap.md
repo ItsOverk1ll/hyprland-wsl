@@ -7,7 +7,8 @@ Where the project stands and what is still to do. Last updated 2026-10-13.
 Checked on Arch, CachyOS, Kali and Mint with clean installs on 2026-10-13, by scripts (a VNC
 client, `hyprctl`, screenshots). The owner then used Kali and Arch through the Windows viewer
 the same day: it looks right, keyboard and tiling work, and Arch felt "super smooth". Everything
-below holds on Arch, CachyOS and Kali. Mint runs on the CPU only (see the gaps).
+below holds on Arch, CachyOS, Kali, and on Mint once Mesa has been upgraded (the installer
+offers that).
 
 - Hyprland on its own headless backend, with no second compositor underneath.
 - Rendering on the GPU through Mesa's Direct3D 12 driver, chosen automatically, with the CPU as
@@ -30,7 +31,7 @@ Also tried on Ubuntu 26.04, from a side-by-side build: starts on GPU and CPU.
 | Slower with many tiles | Reported by the owner on Kali at 2560x1440; not measured. wayvnc encodes on one thread and is the first suspect. |
 | Frame rate at TigerVNC's viewer | Not measured: neither the Windows nor the Linux viewer reports one, and the Windows one would not close on request. While it was connected, wayvnc used about two thirds of one core at 1920x1080 with the whole screen changing. |
 | Windows key capture is unconfirmed | As before: needs a real keyboard. |
-| Mint on the GPU | With Mesa 25.2 the viewer stays blank in GPU mode (capture through `wlr-screencopy` is never answered), so the launcher uses the CPU when Mesa is older than 26. Cause not pinned down. On the CPU it gives 53 updates a second with a scrolling terminal and 6 with a full-screen 3D scene. |
+| Mint needs a second PPA for the GPU | Its Mesa 25.2 leaves the viewer blank in GPU mode. Mesa 26.2 from `ppa:kisak/kisak-mesa` fixes it; the installer asks before adding it. What exactly is broken in 25.2 was not looked into. Mint's old wayvnc also uses about 86 % of one core at 1920x1080 with the whole screen changing, so it has little headroom above that size. |
 | GPU coverage | One NVIDIA card. Other vendors, and machines where WSL has no GPU, are untested; the "no GPU" case was only simulated by making `/dev/dxg` unreadable. |
 | Xwayland draws on the CPU in GPU mode | Its own GPU path makes it exit at start, so it is run with `-glamor off`. Cause not investigated. |
 | waybar did not appear | Started in the test session and showed nothing. Not investigated; it may only need its usual configuration. |
@@ -48,7 +49,7 @@ Next:
 - [x] Someone looks at it in the Windows viewer (Kali and Arch, 2026-10-13)
 - [ ] Still unseen: the WSLg window, CachyOS and Mint, and the Windows key as modifier
 - [x] Rerun Arch, CachyOS and Mint with this version
-- [ ] Find out why capture fails on the GPU with Mesa 25.2 (Mint)
+- [x] Mint on the GPU: works with Mesa 26 from the kisak-mesa PPA, offered by the installer
 - [ ] Rewrite `manual-setup.md` and `troubleshooting.md`
 - [ ] Higher targets than 1920x1080 at 60: 2560x1440 and 3840x2160 through the real viewer
 

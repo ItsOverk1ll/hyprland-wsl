@@ -63,13 +63,15 @@ Ubuntu, 25.2.8 on Mint.
   third-party PPA `ppa:cppiber/hyprland` and asks first.
 - The PPA also upgrades some system libraries (libinput, libxkbcommon, libdisplay-info).
 - The `mint23-amd64` image is a pre-release without a package repository. Do not use it yet.
-- **CPU rendering only.** In GPU mode Hyprland runs and takes input, but the picture never
-  reaches the viewer: capture requests through the `wlr-screencopy` protocol, which Mint's
-  wayvnc (0.7.2) and grim use, are never answered. Kali's newer clients use
-  `ext-image-copy-capture` and Ubuntu 26.04 captures fine through `wlr-screencopy` with Mesa 26,
-  so Mint's Mesa 25.2.8 is the suspect; that was not proven. The launcher uses the CPU when
-  Mesa is older than 26.
-- Its Xwayland (23.2.6) has no `-glamor off`; the launcher uses `-shm` there.
+- **GPU rendering needs a newer Mesa.** With Mint's own Mesa 25.2.8, Hyprland runs and takes
+  input in GPU mode but the picture never reaches the viewer (capture requests are never
+  answered; Hyprland's log stays empty). With Mesa 26.2.4 from `ppa:kisak/kisak-mesa`
+  everything works, at the same 60 updates a second as the other distros. The installer offers
+  that PPA; without it the launcher uses the CPU.
+- Its wayvnc (0.7.2) is old and works harder: about 86 % of one core to send a fully changing
+  1920x1080 screen, against about 25 % with wayvnc 0.10 on the other distros.
+- Its Xwayland (23.2.6) has no `-glamor off`; the launcher uses `-shm` there. The Mesa PPA
+  brings a newer Xwayland that has it.
 - A root filesystem made with an older `tools/merge-layers.sh` has `/` at mode 700, and then
   nothing works for a regular user ("unable to execute /usr/bin/env: Permission denied"). The
   installer now sets it to 755 and says so.
