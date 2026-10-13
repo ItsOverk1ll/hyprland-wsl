@@ -1,21 +1,23 @@
 #!/bin/bash
 # hyprland-wsl: run Hyprland under WSL2 and show it in a window on the Windows desktop.
 #
-# WSL has no GPU device node that Hyprland can use, so this stacks:
-#   vgem (virtual DRM device) -> labwc (headless host compositor, software GL)
-#   -> Hyprland (nested, with the patched aquamarine from install.sh)
-#   -> wayvnc (shares the host's screen) -> vncviewer (a normal WSLg window).
+# WSL has no display device that Hyprland can drive, so this stacks:
+#   vgem (virtual DRM device, for buffer allocation)
+#   -> Hyprland on its headless backend (with the patched aquamarine from install.sh)
+#   -> wayvnc (shares Hyprland's screen) -> vncviewer (a normal WSLg window).
 #
 # Closing the viewer window (or Ctrl+C) shuts everything down.
 
 usage() {
     cat <<'EOF'
-Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--port N] [--no-viewer]
+Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--port N] [--gpu] [--no-viewer]
        hyprland-wsl set-mod SUPER|ALT
 
   WIDTHxHEIGHT   size of the Hyprland screen (default 1600x900)
   --scale N      Hyprland's monitor scale, e.g. 2 for a 3840x2160 screen (default: from the config)
   --port N       VNC port on 127.0.0.1 (default 5900)
+  --gpu          render on the GPU through Mesa's Direct3D 12 driver (experimental;
+                 the default is the CPU)
   --no-viewer    do not open a viewer window; connect any VNC client yourself
 
   set-mod        change the main modifier in the Hyprland config that install.sh wrote.
@@ -28,7 +30,7 @@ case ${1:-} in -h|--help) usage; exit 0 ;; esac
 
 [ "$(id -u)" = 0 ] || exec sudo -- "$0" "$@"
 
-PREFIX=/opt/hyprland-wsl
+PREFIX=${HYPRLAND_WSL_PREFIX:-/opt/hyprland-wsl}
 AQ_LIB=$PREFIX/aquamarine/lib
 CONF=/etc/hyprland-wsl.conf
 LOG=/tmp/hyprland-wsl
@@ -38,9 +40,11 @@ PORT=5900
 VIEWER=1
 SCALE=
 SETMOD=
+GPU=${HYPRLAND_WSL_GPU:-0}
 while [ $# -gt 0 ]; do
     case $1 in
         --no-viewer) VIEWER=0 ;;
+        --gpu) GPU=1 ;;
         --port) PORT=$2; shift ;;
         --scale) SCALE=$2; shift ;;
         set-mod) SETMOD=${2:-}; shift ;;
@@ -82,8 +86,8 @@ H=$(getent passwd "$U" | cut -d: -f6)
 R=/run/user/$(id -u "$U")
 pgrep -u "$U" -x Hyprland >/dev/null && die "Hyprland is already running for $U"
 
-# A DRM device for buffer allocation. Dumb buffers are refused on render nodes,
-# so the render node path is pointed at the primary node.
+# A DRM device for buffer allocation. Hyprland is pointed at its primary node, because
+# vgem refuses to allocate through its render node.
 modprobe vgem || die "could not load the vgem kernel module"
 card=
 for c in /sys/class/drm/card[0-9]*; do
@@ -91,10 +95,8 @@ for c in /sys/class/drm/card[0-9]*; do
 done
 [ -n "$card" ] || die "vgem DRM device not found"
 render=$(ls "$card/device/drm" | grep '^renderD' | head -n 1)
-IFS=: read -r major minor < "$card/dev"
-rm -f "/dev/dri/$render"
-mknod "/dev/dri/$render" c "$major" "$minor"
-chmod 666 "/dev/dri/${card##*/}" "/dev/dri/$render"
+DRM=/dev/dri/${card##*/}
+chmod 666 "$DRM" "/dev/dri/$render"
 
 mkdir -p $LOG "$R"
 chown "$U": "$R" && chmod 700 "$R"
@@ -115,7 +117,7 @@ wait_for() { for _ in $(seq 150); do "$@" && return 0; sleep 0.1; done; return 1
 cleanup() {
     trap - EXIT INT TERM
     pkill -u "$U" -x Hyprland; sleep 0.5
-    pkill -u "$U" -x wayvnc; pkill -u "$U" -x labwc
+    pkill -u "$U" -x wayvnc
     [ -n "$VNCVIEWER" ] && pkill -u "$U" -x "${VNCVIEWER##*/}"
     # Where libseat has its built-in backend, Hyprland leaves a helper process behind.
     pkill -9 -u "$U" -x Hyprland
@@ -123,13 +125,13 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# The compositors run in a private mount namespace, held open by a sleeping process, where:
+# Hyprland runs in a private mount namespace, held open by a sleeping process, where:
 # - the patched aquamarine sits on top of the system one. LD_LIBRARY_PATH would not do:
 #   some distros give Hyprland a file capability, and the loader then ignores it.
 # - /tmp/.X11-unix is a fresh directory. WSLg mounts its own there without the sticky bit,
-#   which makes Xwayland setup fail, and older labwc versions then refuse to start.
-#   WSLg's sockets are mounted into the fresh directory, so that the compositors' own
-#   Xwayland servers see those display numbers as taken. Otherwise one of them becomes :0,
+#   which makes Xwayland setup fail.
+#   WSLg's sockets are mounted into the fresh directory, so that Hyprland's own
+#   Xwayland server sees those display numbers as taken. Otherwise it becomes :0,
 #   and the viewer, which reaches X through a socket name shared by all of WSL, would open
 #   its window inside the session instead of on the Windows desktop.
 mkdir -p /tmp/.X11-unix /run/hyprland-wsl/x11
@@ -155,24 +157,12 @@ as() { nsenter -t $NS -m --wd="$H" sudo -u "$U" env -u WAYLAND_DISPLAY -u DISPLA
 
 cd "$H" || exit 1
 
-# Host compositor: no decorations, Hyprland's window fills the screen.
-as mkdir -p "$H/.config/hyprland-wsl/labwc"
-as tee "$H/.config/hyprland-wsl/labwc/rc.xml" > /dev/null <<'EOF'
-<?xml version="1.0"?>
-<labwc_config>
-  <core><decoration>client</decoration></core>
-  <windowRules>
-    <windowRule identifier="*" serverDecoration="no"><action name="Maximize"/></windowRule>
-  </windowRules>
-</labwc_config>
-EOF
-
-as WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_LIBINPUT_NO_DEVICES=1 \
-    labwc -C "$H/.config/hyprland-wsl/labwc" > $LOG/labwc.log 2>&1 &
-wait_for test -S "$R/wayland-0" || die "host compositor did not start, see $LOG/labwc.log"
-as WAYLAND_DISPLAY=wayland-0 wlr-randr --output HEADLESS-1 --custom-mode "$RES" > /dev/null 2>&1
-
-as WAYLAND_DISPLAY=wayland-0 Hyprland > $LOG/hyprland.log 2>&1 &
+# Hyprland's headless backend gets the vgem device for its buffers and one output of the
+# requested size. With --gpu, Mesa's Direct3D 12 driver does the drawing; the buffers are
+# then the GPU's own and vgem only lends its name.
+DRIVER=
+[ "$GPU" = 1 ] && DRIVER=GALLIUM_DRIVER=d3d12
+as AQ_HEADLESS_DRM_DEVICE="$DRM" AQ_HEADLESS_MODE="$RES" $DRIVER Hyprland > $LOG/hyprland.log 2>&1 &
 HYPR=$!
 wait_for test -S "$R/wayland-1" || die "Hyprland did not start, see $LOG/hyprland.log"
 
@@ -182,16 +172,14 @@ if [ -n "$SCALE" ]; then
     wait_for test -S "$R/hypr/$sig/.socket.sock"
     hc() { as HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl "$@"; }
     if [ -f "$H/.config/hypr/hyprland.lua" ]; then
-        hc eval "hl.monitor({ output = \"WAYLAND-1\", mode = \"$RES@60\", position = \"0x0\", scale = $SCALE })"
+        hc eval "hl.monitor({ output = \"HEADLESS-1\", mode = \"$RES@60\", position = \"0x0\", scale = $SCALE })"
     else
-        hc keyword monitor "WAYLAND-1,$RES@60,0x0,$SCALE"
+        hc keyword monitor "HEADLESS-1,$RES@60,0x0,$SCALE"
     fi > $LOG/scale.log 2>&1
     grep -q '^ok' $LOG/scale.log || echo "hyprland-wsl: could not set the scale, see $LOG/scale.log" >&2
 fi
 
-# wayvnc attaches to Hyprland itself, not to the host. Keys then reach Hyprland without
-# passing the host's own key bindings (Alt+Tab, Alt+F4, Super+Return and so on), and the
-# host is not made to render for a second observer.
+# Hyprland never names its socket wayland-0.
 as WAYLAND_DISPLAY=wayland-1 wayvnc 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
 wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
 echo "Hyprland is running at $RES (VNC on 127.0.0.1:$PORT)."
