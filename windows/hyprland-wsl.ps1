@@ -7,7 +7,7 @@
 #   .\hyprland-wsl.ps1 -Distro Ubuntu-26.04            full screen, keyboard captured
 #   .\hyprland-wsl.ps1 -Distro archlinux -Windowed     in a window
 #
-# Leaving full screen or the session: press F8 in the viewer for its menu.
+# Leaving full screen: Ctrl+Alt+Enter (TigerVNC 1.16; older versions used an F8 menu).
 # Closing the viewer ends the Hyprland session.
 
 #

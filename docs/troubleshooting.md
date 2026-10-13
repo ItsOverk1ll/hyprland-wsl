@@ -107,7 +107,7 @@ uses ALT as the main modifier. For a real SUPER key, start the session with
 once inside the distro. In the Windows viewer the keyboard is only captured in full screen.
 
 **Stuck in the full-screen viewer**
-Press F8 for the viewer's menu, which can leave full screen or quit.
+Press Ctrl+Alt+Enter to leave full screen (TigerVNC 1.16; older versions used an F8 menu).
 
 **Alt+Tab, Alt+F4 or the arrow keys with Alt do nothing inside Hyprland**
 With a launcher from before 2026-10-11 the host compositor kept those shortcuts for itself.

@@ -120,7 +120,7 @@ Then switch Hyprland's main modifier to the Windows key, once, inside the distro
 hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
 ```
 
-- Press **F8** in the viewer for its menu: leave full screen, or quit.
+- Press **Ctrl+Alt+Enter** to leave or enter full screen (TigerVNC 1.16; older versions used an F8 menu).
 - Closing the viewer ends the session.
 - The first run downloads TigerVNC's standalone viewer (about 24 MB, checked for a valid
   signature) to `%LOCALAPPDATA%\hyprland-wsl`. An installed TigerVNC is used instead if present.
