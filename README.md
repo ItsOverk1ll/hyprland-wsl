@@ -15,6 +15,7 @@ The aim is to support all major Linux distributions under WSL2.
 - [Distro notes](docs/distros.md): versions and quirks per distro
 - [Setting it up by hand](docs/manual-setup.md): the installer and launcher as individual steps
 - [Troubleshooting](docs/troubleshooting.md): error messages and what to do about them
+- [Omarchy](docs/omarchy.md): DHH's Hyprland distribution in a WSL instance
 - [Status and roadmap](docs/roadmap.md): what works, known gaps, what is planned
 - [Changelog](CHANGELOG.md): what changed and when
 
@@ -29,6 +30,8 @@ Tested on 2026-10-13 with WSL 2.5.9, each with a clean install:
 | Kali Linux (rolling) | 0.56.2 | distro repos | GPU |
 | Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format, and less smooth than the others (see [distro notes](docs/distros.md)) |
 | Linux Mint 22.3 | 0.56.2 | third-party PPA | GPU with a newer Mesa from a second PPA, otherwise CPU; no WSL image; Mint has no Hyprland package of its own |
+
+[Omarchy](docs/omarchy.md) 4.0.4 runs too, in an Arch instance, with its own installer script.
 
 Other Arch-based and Debian/Ubuntu-based distros may work, since the installer goes by package
 family, but only the ones above were tried. Ubuntu 24.04 should behave like Mint 22.3 (same base)

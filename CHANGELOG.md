@@ -2,6 +2,25 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-13: Omarchy
+
+### Added
+
+- **Omarchy in WSL.** `windows\install-omarchy.ps1` creates an Arch instance and installs
+  [Omarchy](https://omarchy.org) 4.0.4 into it with hyprland-wsl on top: Omarchy's packages,
+  its system setup and its per-user setup, without the parts about booting and real hardware.
+  The work is done by `tools/omarchy-wsl.sh`. See [docs/omarchy.md](docs/omarchy.md).
+
+### Changed
+
+- **The installer leaves upgrades to Omarchy** where Omarchy is installed. It used to run a
+  full `pacman -Syu`, which Omarchy blocks outside `omarchy update`.
+
+### Known limits
+
+- Chromium, and apps built on it, need `--disable-gpu` in GPU mode on every distro. The
+  Omarchy script sets it; elsewhere it is a manual step (see troubleshooting).
+
 ## 2026-10-13: Hyprland on its own, drawn by the GPU
 
 The stack lost a layer and gained GPU rendering. Hyprland no longer runs inside a second

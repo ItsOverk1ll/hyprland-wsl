@@ -21,6 +21,7 @@ offers that).
 - Keyboard through VNC (Super+Q opens a terminal), screen size and scale at launch.
 - One installer for pacman- and apt-based distros, one launcher, a Windows-side launcher.
 - Clean shutdown.
+- Omarchy 4.0.4 in an Arch instance, installed by `windows\install-omarchy.ps1` (see [omarchy.md](omarchy.md)).
 
 Ubuntu 26.04 passes the same checks from a clean install, with lower frame rates (see the gaps).
 
@@ -33,6 +34,8 @@ Ubuntu 26.04 passes the same checks from a clean install, with lower frame rates
 | Frame rate at TigerVNC's viewer | Not measured: neither the Windows nor the Linux viewer reports one, and the Windows one would not close on request. While it was connected, wayvnc used about two thirds of one core at 1920x1080 with the whole screen changing. |
 | Windows key capture is unconfirmed | As before: needs a real keyboard. |
 | Mint needs a second PPA for the GPU | Its Mesa 25.2 leaves the viewer blank in GPU mode. Mesa 26.2 from `ppa:kisak/kisak-mesa` fixes it; the installer asks before adding it. What exactly is broken in 25.2 was not looked into. Mint's old wayvnc also uses about 86 % of one core at 1920x1080 with the whole screen changing, so it has little headroom above that size. |
+| Chromium needs `--disable-gpu` in GPU mode | It wants scanout buffers from GBM, which the Direct3D 12 driver does not provide. Found on Omarchy; applies to every distro. The Omarchy script sets the flag; elsewhere it is manual. |
+| Omarchy is only script-tested | Start-up, shell, terminal, menus, file manager and browser were checked by screenshots. Audio, the lock screen, `omarchy update` and theme switching were not tried. |
 | GPU coverage | One NVIDIA card. Other vendors, and machines where WSL has no GPU, are untested; the "no GPU" case was only simulated by making `/dev/dxg` unreadable. |
 | Xwayland draws on the CPU in GPU mode | Its own GPU path makes it exit at start, so it is run with `-glamor off`. Cause not investigated. |
 | waybar did not appear | Started in the test session and showed nothing. Not investigated; it may only need its usual configuration. |

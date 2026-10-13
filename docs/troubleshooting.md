@@ -111,6 +111,12 @@ The server sends the viewer a pointer image that is fully transparent, and Windo
 cursor as a black square. The current `windows\hyprland-wsl.ps1` asks the viewer for its dot
 cursor instead; update the clone. What remains is a small dot at the pointer's tip.
 
+**Chromium, or an app built on it, does not open in GPU mode**
+It asks the GPU driver for a kind of buffer that Mesa's Direct3D 12 driver does not hand out
+(`Cannot create bo with format=RGBA_8888 and usage=Scanout|Rendering|Texturing` in its output)
+and exits. Start it with `--disable-gpu`, or put that line in `~/.config/chromium-flags.conf` on
+Arch-based distros. The page is then drawn on the CPU; Hyprland still composes on the GPU.
+
 **X11 apps do not open in GPU mode**
 Xwayland's own GPU drawing makes it exit at start here, so the launcher runs it with
 `-glamor off` or `-shm`. If an X11 app reports `Can't open display`, look at

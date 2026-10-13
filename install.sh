@@ -112,7 +112,11 @@ arch)
     pacman-key --init
     pacman-key --populate
     # A full upgrade, because Arch does not support installing onto a partly updated system.
-    pacman -Syu --noconfirm --needed \
+    # Not on Omarchy: it upgrades through "omarchy update" only and blocks a direct one, and
+    # its package snapshot is consistent as it stands.
+    sync=-Syu
+    pacman -Q omarchy >/dev/null 2>&1 && sync=-Sy
+    pacman $sync --noconfirm --needed \
         hyprland foot mesa wayvnc tigervnc sudo ttf-dejavu curl \
         base-devel cmake ninja hyprwayland-scanner wayland-protocols
     ;;
