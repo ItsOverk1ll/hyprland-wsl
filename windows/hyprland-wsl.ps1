@@ -101,9 +101,10 @@ try {
     if (-not $up) { throw "Hyprland did not come up. Run 'hyprland-wsl --no-viewer' inside the distro to see why." }
 
     $viewerArgs = @('-RemoteResize=0', '-FullscreenSystemKeys=1')
-    # Hyprland draws the pointer into the picture and the server sends an empty pointer image.
-    # Newer viewers then draw a dot of their own on top; switch that off where the option exists.
-    if ([IO.File]::ReadAllText($viewer, [Text.Encoding]::ASCII).Contains('AlwaysCursor')) { $viewerArgs += '-AlwaysCursor=0' }
+    # Hyprland draws the pointer into the picture, and the server sends the viewer a pointer image
+    # that is fully transparent. Windows shows such a cursor as a black square. Asking the viewer
+    # for its dot cursor instead leaves only a small dot at the pointer's tip.
+    if ([IO.File]::ReadAllText($viewer, [Text.Encoding]::ASCII).Contains('AlwaysCursor')) { $viewerArgs += '-AlwaysCursor=1', '-CursorType=Dot' }
     if (-not $Windowed) { $viewerArgs += '-FullScreen=1' }
     $viewerArgs += "127.0.0.1::$Port"
     Start-Process $viewer -ArgumentList $viewerArgs -Wait

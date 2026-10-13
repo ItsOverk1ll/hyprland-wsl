@@ -216,8 +216,10 @@ def main():
             return
         elif cmd == "cursor":
             # what pointer image does the server hand to a viewer that draws the pointer itself?
-            v.s.sendall(struct.pack(">BxHii", 2, 2, 0, -239))     # encodings: raw, cursor
-            v.pointer(v.w // 2, v.h // 2); time.sleep(0.3); v.pointer(v.w // 2 + 5, v.h // 2 + 5)
+            # encodings: raw, cursor with alpha (what TigerVNC asks for), plain cursor
+            v.s.sendall(struct.pack(">BxHiii", 2, 3, 0, -314, -239))
+            if a and a[0] == "move":                 # "cursor move": also nudge the pointer first
+                a.pop(0); v.pointer(v.w // 2, v.h // 2); time.sleep(0.3); v.pointer(v.w // 2 + 5, v.h // 2 + 5)
             v.s.settimeout(3)
             found = False
             try:
@@ -228,7 +230,15 @@ def main():
                     v.read(1)
                     for _r in range(struct.unpack(">H", v.read(2))[0]):
                         x, y, w, h, enc = struct.unpack(">HHHHi", v.read(12))
-                        if enc == -239:
+                        if enc == -314:
+                            v.read(4)
+                            px = v.read(w * h * 4)
+                            opaque = sum(1 for i in range(3, len(px), 4) if px[i] > 127)
+                            dark = sum(1 for i in range(0, len(px), 4) if px[i] < 16 and px[i + 1] < 16 and px[i + 2] < 16)
+                            print("pointer image with alpha %dx%d, hotspot %d,%d: %d of %d pixels opaque, %d black"
+                                  % (w, h, x, y, opaque, w * h, dark))
+                            found = True
+                        elif enc == -239:
                             px = v.read(w * h * 4); mask = v.read(((w + 7) // 8) * h)
                             shown = sum(bin(b).count("1") for b in mask)
                             dark = sum(1 for i in range(0, len(px), 4) if px[i] < 16 and px[i + 1] < 16 and px[i + 2] < 16)
