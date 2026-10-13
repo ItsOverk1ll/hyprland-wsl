@@ -13,14 +13,16 @@
 #
 # Full screen on a scaled display (for example 3840x2160 at 150 %): by default Hyprland renders
 # at the size Windows calls 100 % (2560x1440 in that example) and Windows enlarges the picture
-# to fill the screen. Hyprland renders on the CPU, and the full resolution is too many pixels
-# for it to stay smooth. -Native renders every pixel instead: sharper, and much slower.
+# to fill the screen. -Native renders every pixel instead: sharper. That is fine when Hyprland
+# renders on the GPU (the default where WSL exposes one), and too slow on the CPU.
 
 param(
     [string] $Distro,                  # default: the default WSL distro
     [string] $Size,                    # WIDTHxHEIGHT; default: see above (1600x900 with -Windowed)
     [double] $Scale = 0,               # Hyprland's scale; default 1, or the Windows scale with -Native
     [int]    $Port = 5900,
+    [int]    $Fps = 60,                # most frames per second sent to the viewer
+    [switch] $Software,                # render on the CPU even if a GPU is available
     [switch] $Windowed,
     [switch] $Native                   # full screen at the display's real resolution
 )
@@ -85,7 +87,9 @@ $wsl += '-u', 'root', '--'
 if (Test-Vnc) { throw "Something already answers on port $Port. Stop that session or pick another -Port." }
 
 Write-Host "Starting Hyprland at $Size, scale $scaleText ..."
-$session = Start-Process wsl.exe -ArgumentList ($wsl + 'hyprland-wsl', $Size, '--scale', $scaleText, '--port', $Port, '--no-viewer') `
+$launch = @('hyprland-wsl', $Size, '--scale', $scaleText, '--port', $Port, '--fps', $Fps, '--no-viewer')
+if ($Software) { $launch += '--software' }
+$session = Start-Process wsl.exe -ArgumentList ($wsl + $launch) `
     -WindowStyle Hidden -PassThru
 try {
     $up = $false

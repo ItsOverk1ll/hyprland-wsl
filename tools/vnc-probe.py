@@ -10,7 +10,8 @@ It sees and does what a real viewer would: takes screenshots, moves the pointer,
   vnc-probe.py PORT type "hello"            type text
   vnc-probe.py PORT hold SECONDS            stay connected, requesting updates (for load tests)
   vnc-probe.py PORT latency N               time from a key press to the screen changing
-  vnc-probe.py PORT fps SECONDS             screen updates per second (start something moving first)
+  vnc-probe.py PORT fps SECONDS             screen updates per second and their spacing (start something
+                                            moving first)
 
 Several actions can be chained:  vnc-probe.py 5900 key super+q wait 2 shot after.png
 Needs only the Python standard library. No authentication, 127.0.0.1 only.
@@ -50,6 +51,36 @@ class Vnc:
                 sys.exit("server closed the connection")
             buf += chunk
         return bytes(buf)
+
+    def skip_frame(self):
+        """Request changes, wait for the update and throw the pixels away. Returns the pixel count.
+        Much cheaper than frame(), so that counting updates measures the server, not this script."""
+        if not hasattr(self, "scratch"):
+            self.scratch = memoryview(bytearray(1 << 20))
+        self.s.sendall(struct.pack(">BBHHHH", 3, 1, 0, 0, self.w, self.h))
+        while True:
+            kind = self.read(1)[0]
+            if kind == 0:
+                break
+            if kind == 2:
+                continue
+            if kind == 3:
+                self.read(3); self.read(struct.unpack(">I", self.read(4))[0]); continue
+            sys.exit("unexpected server message %d" % kind)
+        self.read(1)
+        pixels = 0
+        for _ in range(struct.unpack(">H", self.read(2))[0]):
+            x, y, w, h, enc = struct.unpack(">HHHHi", self.read(12))
+            if enc != 0:
+                sys.exit("unexpected encoding %d" % enc)
+            left = w * h * 4
+            pixels += w * h
+            while left:
+                n = self.s.recv_into(self.scratch[:min(left, len(self.scratch))])
+                if not n:
+                    sys.exit("server closed the connection")
+                left -= n
+        return pixels
 
     def frame(self, incremental=0):
         """Request an update and return the framebuffer as rows of RGBX bytes."""
@@ -161,16 +192,26 @@ def main():
             print("settled after %.2f s, %d updates (%.0f per second)" % (dur, n, n / dur if dur > 0 else 0))
             return
         elif cmd == "fps":
-            # screen updates per second while something is moving
-            secs = float(a.pop(0)); end = time.time() + secs; n = 0
+            # screen updates per second while something is moving, and how even they are
+            secs = float(a.pop(0)); n = 0; pixels = 0; gaps = []
             v.frame()
+            v.s.settimeout(5)
+            start = last = time.time()
             try:
-                while time.time() < end:
-                    v.s.settimeout(max(end - time.time(), 0.1))
-                    v.frame(incremental=1); n += 1
+                while last - start < secs:
+                    pixels += v.skip_frame(); n += 1
+                    now = time.time(); gaps.append(now - last); last = now
             except socket.timeout:
                 pass
-            print("updates per second: %.1f" % (n / secs))
+            dur = last - start
+            gaps.sort()
+            if n:
+                print("updates per second: %.1f over %.1f s (gap between updates: median %.1f ms, 99th percentile %.1f ms, "
+                      "worst %.1f ms; %.0f %% of the screen per update)"
+                      % (n / dur, dur, gaps[n // 2] * 1000, gaps[min(n - 1, n * 99 // 100)] * 1000, gaps[-1] * 1000,
+                         100.0 * pixels / n / (v.w * v.h)))
+            else:
+                print("no updates in %.0f s" % secs)
             return
         elif cmd == "wait":
             time.sleep(float(a.pop(0)))

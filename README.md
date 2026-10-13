@@ -2,9 +2,10 @@
 
 Run [Hyprland](https://hypr.land) inside WSL2, in a window on the Windows desktop.
 
-Hyprland does not run under WSL out of the box: WSL has no GPU device node it can use, and WSLg's
-compositor lacks the protocols Hyprland needs to run nested. This repository installs a stack that
-works around both.
+Hyprland does not run under WSL out of the box: WSL has no display device it can drive, and
+WSLg's compositor lacks the protocols Hyprland needs to run nested. This repository makes
+Hyprland run on a screen in memory instead, drawn by the GPU where WSL exposes one, and shows
+that screen in a window.
 
 The aim is to support all major Linux distributions under WSL2.
 
@@ -18,7 +19,9 @@ The aim is to support all major Linux distributions under WSL2.
 
 ## Supported distros
 
-Tested on 2026-10-11 with WSL 2.5.9:
+With WSL 2.5.9. The current version was tested on 2026-10-13 on Kali (clean install) and tried
+on Ubuntu 26.04; the other three were last tested on 2026-10-11 with the earlier version and
+have not been rerun:
 
 | Distro | Hyprland | Comes from | Notes |
 | --- | --- | --- | --- |
@@ -53,7 +56,7 @@ If `git` is missing: `pacman -Sy --needed git` on Arch-based distros (on a fresh
 
 The installer:
 
-- installs Hyprland, foot, labwc, wayvnc, TigerVNC's viewer and a build toolchain. On Arch-based
+- installs Hyprland, foot, wayvnc, TigerVNC's viewer and a build toolchain. On Arch-based
   distros this is a full system upgrade (`pacman -Syu`), because Arch does not support installing
   onto a partly updated system.
 - picks the user Hyprland runs as (the invoking user, else the first regular user, else a new
@@ -75,11 +78,19 @@ allow it without the question: `HYPRLAND_PPA=1 ./install.sh`.
 ## Use
 
 ```sh
-hyprland-wsl                    # 1600x900 window
-hyprland-wsl 1920x1080          # another size
+hyprland-wsl                    # 1920x1080 window
+hyprland-wsl 1600x900           # another size
 hyprland-wsl 2560x1440 --scale 1.25 # larger screen, everything drawn a quarter bigger
+hyprland-wsl --software         # draw on the CPU even if a GPU is available
 hyprland-wsl --no-viewer        # no window; connect a VNC client to 127.0.0.1:5900
 hyprland-wsl --port 5901
+```
+
+It draws on the GPU when WSL exposes one (`/dev/dxg`) and the distro's Mesa has the Direct3D 12
+driver, otherwise on the CPU, and says which when it starts:
+
+```
+Hyprland is running at 1920x1080, rendering on the GPU (VNC on 127.0.0.1:5900).
 ```
 
 From Windows: `wsl -d <distro> hyprland-wsl`
@@ -96,12 +107,13 @@ full screen, with the keyboard captured:
 ```powershell
 .\windows\hyprland-wsl.cmd -Distro <distro>              # full screen
 .\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
-.\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered (slow at 4K)
+.\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered
+.\windows\hyprland-wsl.cmd -Distro <distro> -Software    # draw on the CPU
 ```
 
 On a scaled display, full screen renders at the size Windows calls 100 % and Windows enlarges
-the picture: a 3840x2160 display at 150 % gets a 2560x1440 Hyprland. That keeps it smooth.
-Rendering all 3840x2160 pixels on the CPU (`-Native`) is sharper but too slow for comfortable use.
+the picture: a 3840x2160 display at 150 % gets a 2560x1440 Hyprland. `-Native` renders every
+pixel instead, which is sharper; on the CPU that is too slow for comfortable use at 3840x2160.
 
 Then switch Hyprland's main modifier to the Windows key, once, inside the distro:
 
@@ -166,35 +178,45 @@ Put the distro on an SSD. On a hard disk, package installation inside WSL is man
 
 ```
 VNC viewer (a WSLg window, or a viewer on Windows itself)
-   └─ wayvnc ─────────────┐ captures Hyprland, sends input to it
-labwc, headless, software GL
-   └─ Hyprland, nested, with patched aquamarine
-        └─ your apps
+   └─ wayvnc              captures Hyprland, sends input to it
+Hyprland, on its headless backend, with patched aquamarine
+   └─ your apps
 ```
 
-- **vgem** provides a DRM device for buffer allocation. The render node path is pointed at the
-  primary node, because dumb buffers cannot be allocated through a render node.
-- **labwc** runs headless as the host compositor. It offers `linux-dmabuf`, which Hyprland's
-  nested backend requires and WSLg's compositor does not provide.
-- **aquamarine** (Hyprland's backend library) needs fixes to run under such a host; see
-  [`patches/`](patches/). There is one patch per layout of the patched file, and the installer
-  uses the one that applies to the distro's aquamarine version.
-- The compositors run in a **private mount namespace**. In it the patched aquamarine is mounted
-  over the system one (an `LD_LIBRARY_PATH` is ignored on distros that give Hyprland a file
+- **vgem**, a virtual DRM device in the WSL kernel, is the device Hyprland allocates its buffers
+  on. It has no display and does no drawing.
+- **aquamarine** (Hyprland's backend library) is patched so that its headless backend opens that
+  device; unpatched, it has none and Hyprland cannot start. See [`patches/`](patches/).
+- **Mesa** draws: on the GPU through its Direct3D 12 driver, or on the CPU.
+- Hyprland runs in a **private mount namespace**. In it the patched aquamarine is mounted over
+  the system one (an `LD_LIBRARY_PATH` is ignored on distros that give Hyprland a file
   capability), and `/tmp/.X11-unix` is a fresh directory (WSLg's one makes Xwayland setup fail).
 - **wayvnc** attaches to Hyprland and TigerVNC's viewer shows it, either inside WSL (displayed
   by WSLg) or on Windows itself. Keyboard and mouse go back the same way.
 
+More in [docs/how-it-works.md](docs/how-it-works.md).
+
+## Performance
+
+Measured on 2026-10-13 on Kali, with an RTX 4060, at 1920x1080, by a scripted VNC client counting
+the updates it receives:
+
+| What is on screen | GPU | CPU |
+| --- | --- | --- |
+| A 3D scene filling the screen (glmark2 terrain) | 60 per second, Hyprland at 21 % of one core | 6 per second (the app itself is drawn on the CPU too) |
+| A scrolling terminal, full screen | 60 per second, 16 % | 55 per second, 231 % |
+| Idle | 0 % | 0 % |
+
+The frame rate at TigerVNC's own viewer has not been measured; that viewer does not report one.
+
 ## Limitations
 
-- Rendering is on the CPU (llvmpipe). It idles near zero, but animations and blur cost CPU.
-  Up to about 2560x1440 it is smooth; at 3840x2160 it is not.
-- On Ubuntu 26.04, Hyprland uses about three CPU cores for as long as a viewer is connected,
-  even when nothing moves. Its older Hyprland redraws the screen for every capture. The other
-  distros idle near zero.
+- The picture goes through VNC, which costs a copy and an encode per frame.
+- GPU rendering needs a GPU that WSL exposes and a Mesa built with the Direct3D 12 driver. It was
+  tested with one NVIDIA card only.
+- On the CPU, animations and blur cost CPU in proportion to the screen size.
 - In the WSLg window on a high-resolution display, things are small unless a larger size and
   `--scale` are given. The Windows-side launcher picks both from the display.
-- XWayland apps inside Hyprland are untested.
 - The screen size is fixed when the session starts.
 - The patched aquamarine is tied to the distro's aquamarine version. After a system update that
   changes Hyprland or aquamarine, the launcher says so; rerun `./install.sh` to rebuild. Patches

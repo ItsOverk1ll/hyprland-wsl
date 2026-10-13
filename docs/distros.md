@@ -1,7 +1,12 @@
 # Distro notes
 
-What was found on each distro, as tested on 2026-10-11 with WSL 2.5.9 (kernel 6.6.87.2). Versions
-are what the distros shipped that day and will move.
+What was found on each distro with WSL 2.5.9 (kernel 6.6.87.2). Versions are what the distros
+shipped on 2026-10-11 and will move.
+
+The current stack (Hyprland on its headless backend, GPU rendering) was tested on 2026-10-13 on
+**Kali** with a clean install, and tried on **Ubuntu 26.04** from a side-by-side build. Arch,
+CachyOS and Mint were tested with the earlier labwc-based stack only (branch `main`); their
+notes below are from then.
 
 | | Arch | CachyOS | Kali rolling | Ubuntu 26.04 | Linux Mint 22.3 |
 | --- | --- | --- | --- | --- | --- |
@@ -9,7 +14,6 @@ are what the distros shipped that day and will move.
 | Package manager | pacman | pacman | apt | apt | apt |
 | Hyprland | 0.56.2 | 0.56.2 | 0.56.2 | 0.53.3 | 0.56.2, from a PPA |
 | aquamarine | 0.15.1 | 0.15.1 | 0.14.0 | 0.10.0 | 0.15.1, from a PPA |
-| labwc (host) | 0.20.2 | 0.20.2 | 0.20.2 | 0.9.3 | 0.7.1 |
 | Config format | Lua | Lua | Lua | `hyprland.conf` | Lua |
 | Install time on an SSD | under 1 min | under 1 min | 1 to 2 min | under 1 min | under 1 min |
 
@@ -40,9 +44,11 @@ are what the distros shipped that day and will move.
 
 - Hyprland 0.53.3, which is noticeably older: it uses the `hyprland.conf` format, not Lua, and
   logs nothing unless asked to (see [troubleshooting.md](troubleshooting.md)).
-- aquamarine 0.10.0 needs its own patch file, which has one more fix than the newer one.
-- Its labwc refuses to start over WSLg's `/tmp/.X11-unix`; the launcher's mount namespace takes
-  care of that.
+- aquamarine 0.10.0 needs its own patch file (`headless-drm-0.10.patch`).
+- Works on the GPU and on the CPU. On the CPU it is slow to react (about 130 ms from key to
+  screen, against 8 ms on the GPU).
+- The monitor reports 0.06 Hz. aquamarine 0.10 gives the headless output a refresh rate of 60
+  where later versions give 60000 (the unit is mHz). Not looked into further.
 
 ## Linux Mint 22.3
 
@@ -56,7 +62,6 @@ are what the distros shipped that day and will move.
 - Mint 22.x is built on Ubuntu 24.04, which has no Hyprland package. The installer offers the
   third-party PPA `ppa:cppiber/hyprland` and asks first.
 - The PPA also upgrades some system libraries (libinput, libxkbcommon, libdisplay-info).
-- Its labwc (0.7.1) is the oldest host tested and needs the patch's protocol-version fix.
 - The `mint23-amd64` image is a pre-release without a package repository. Do not use it yet.
 
 ## Not covered yet

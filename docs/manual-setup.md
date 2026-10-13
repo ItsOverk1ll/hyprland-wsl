@@ -1,5 +1,9 @@
 # Setting it up by hand
 
+> **Not yet updated.** This page still describes the earlier stack, where Hyprland ran nested
+> inside labwc (branch `main`). The current stack has no labwc, no `wlr-randr` and no redirected
+> render node; see [how-it-works.md](how-it-works.md). The scripts are the reference.
+
 What `install.sh` and the `hyprland-wsl` launcher do, as individual steps. Use this to understand
 the scripts, to adapt them to a distro they do not cover, or to debug a step that fails.
 

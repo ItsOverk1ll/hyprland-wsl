@@ -10,14 +10,16 @@
 
 usage() {
     cat <<'EOF'
-Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--port N] [--gpu] [--no-viewer]
+Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--fps N] [--port N] [--gpu|--software] [--no-viewer]
        hyprland-wsl set-mod SUPER|ALT
 
-  WIDTHxHEIGHT   size of the Hyprland screen (default 1600x900)
+  WIDTHxHEIGHT   size of the Hyprland screen (default 1920x1080)
   --scale N      Hyprland's monitor scale, e.g. 2 for a 3840x2160 screen (default: from the config)
   --port N       VNC port on 127.0.0.1 (default 5900)
-  --gpu          render on the GPU through Mesa's Direct3D 12 driver (experimental;
-                 the default is the CPU)
+  --fps N        most frames per second sent to the viewer (default 60)
+  --gpu          render on the GPU, through Mesa's Direct3D 12 driver
+  --software     render on the CPU
+                 (default: the GPU if WSL exposes one and Mesa has the driver)
   --no-viewer    do not open a viewer window; connect any VNC client yourself
 
   set-mod        change the main modifier in the Hyprland config that install.sh wrote.
@@ -35,16 +37,19 @@ AQ_LIB=$PREFIX/aquamarine/lib
 CONF=/etc/hyprland-wsl.conf
 LOG=/tmp/hyprland-wsl
 
-RES=1600x900
+RES=1920x1080
+FPS=60
 PORT=5900
 VIEWER=1
 SCALE=
 SETMOD=
-GPU=${HYPRLAND_WSL_GPU:-0}
+GPU=${HYPRLAND_WSL_GPU:-auto}
 while [ $# -gt 0 ]; do
     case $1 in
         --no-viewer) VIEWER=0 ;;
         --gpu) GPU=1 ;;
+        --software) GPU=0 ;;
+        --fps) FPS=$2; shift ;;
         --port) PORT=$2; shift ;;
         --scale) SCALE=$2; shift ;;
         set-mod) SETMOD=${2:-}; shift ;;
@@ -160,29 +165,79 @@ cd "$H" || exit 1
 # Hyprland's headless backend gets the vgem device for its buffers and one output of the
 # requested size. With --gpu, Mesa's Direct3D 12 driver does the drawing; the buffers are
 # then the GPU's own and vgem only lends its name.
+if [ "$GPU" = auto ]; then
+    GPU=0
+    for d in /usr/lib/*/dri /usr/lib/dri /usr/lib64/dri; do
+        [ -e /dev/dxg ] && [ -e "$d/d3d12_dri.so" ] && GPU=1
+    done
+fi
 DRIVER=
-[ "$GPU" = 1 ] && DRIVER=GALLIUM_DRIVER=d3d12
-as AQ_HEADLESS_DRM_DEVICE="$DRM" AQ_HEADLESS_MODE="$RES" $DRIVER Hyprland > $LOG/hyprland.log 2>&1 &
-HYPR=$!
-wait_for test -S "$R/wayland-1" || die "Hyprland did not start, see $LOG/hyprland.log"
+if [ "$GPU" = 1 ]; then
+    DRIVER=GALLIUM_DRIVER=d3d12
+    # Xwayland's own GPU drawing does not survive this setup (it exits at start), so Hyprland is
+    # given a wrapper that switches it off. X11 apps still draw with the GPU themselves.
+    XW=$(command -v Xwayland)
+    if [ -n "$XW" ]; then
+        mkdir -p /run/hyprland-wsl/bin
+        printf '#!/bin/sh
+exec %s "$@" -glamor off
+' "$XW" > /run/hyprland-wsl/bin/Xwayland
+        chmod 755 /run/hyprland-wsl/bin/Xwayland
+        DRIVER="$DRIVER PATH=/run/hyprland-wsl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    fi
+fi
+start_hyprland() {
+    as AQ_HEADLESS_DRM_DEVICE="$DRM" AQ_HEADLESS_MODE="$RES" $DRIVER Hyprland > $LOG/hyprland.log 2>&1 &
+    HYPR=$!
+    for _ in $(seq 150); do
+        [ -S "$R/wayland-1" ] && return 0
+        kill -0 $HYPR 2>/dev/null || return 1
+        sleep 0.1
+    done
+    return 1
+}
+if ! start_hyprland && [ "$GPU" = 1 ]; then
+    echo "hyprland-wsl: Hyprland did not start on the GPU; trying the CPU (GPU attempt: $LOG/hyprland-gpu.log)" >&2
+    pkill -9 -u "$U" -x Hyprland
+    mv $LOG/hyprland.log $LOG/hyprland-gpu.log
+    rm -rf "$R/hypr" "$R"/wayland-*
+    GPU=0 DRIVER=
+    start_hyprland
+fi
+[ -S "$R/wayland-1" ] || die "Hyprland did not start, see $LOG/hyprland.log"
 
+sig=
+hc() { as HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl "$@"; }
 if [ -n "$SCALE" ]; then
     # Hyprland with a Lua config takes this through "eval", older versions through "keyword".
     sig=$(ls "$R/hypr" | head -n 1)
     wait_for test -S "$R/hypr/$sig/.socket.sock"
-    hc() { as HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl "$@"; }
+    mon=
+    for _ in $(seq 50); do
+        mon=$(hc monitors | awk '$1 == "Monitor" { print $2; exit }')
+        [ -n "$mon" ] && break
+        sleep 0.1
+    done
     if [ -f "$H/.config/hypr/hyprland.lua" ]; then
-        hc eval "hl.monitor({ output = \"HEADLESS-1\", mode = \"$RES@60\", position = \"0x0\", scale = $SCALE })"
+        hc eval "hl.monitor({ output = \"$mon\", mode = \"$RES@60\", position = \"0x0\", scale = $SCALE })"
     else
-        hc keyword monitor "HEADLESS-1,$RES@60,0x0,$SCALE"
+        hc keyword monitor "$mon,$RES@60,0x0,$SCALE"
     fi > $LOG/scale.log 2>&1
     grep -q '^ok' $LOG/scale.log || echo "hyprland-wsl: could not set the scale, see $LOG/scale.log" >&2
 fi
 
 # Hyprland never names its socket wayland-0.
-as WAYLAND_DISPLAY=wayland-1 wayvnc 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
+as WAYLAND_DISPLAY=wayland-1 wayvnc --max-fps="$FPS" ${HYPRLAND_WSL_WAYVNC_OPTS:-} 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
 wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
-echo "Hyprland is running at $RES (VNC on 127.0.0.1:$PORT)."
+# Say what is really drawing: the Direct3D 12 libraries are loaded only if that driver came up.
+HPID=$(pgrep -u "$U" -x Hyprland | head -n 1)
+if grep -q 'libd3d12' "/proc/$HPID/maps" 2>/dev/null; then
+    RENDER="the GPU"
+else
+    RENDER="the CPU"
+    [ "$GPU" = 1 ] && echo "hyprland-wsl: the Direct3D 12 driver did not start; rendering on the CPU instead" >&2
+fi
+echo "Hyprland is running at $RES, rendering on $RENDER (VNC on 127.0.0.1:$PORT)."
 
 if [ $VIEWER = 1 ]; then
     # WSLg's X server shows this as an ordinary window on the Windows desktop.

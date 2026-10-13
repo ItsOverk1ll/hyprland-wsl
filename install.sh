@@ -30,7 +30,7 @@ case " $ID ${ID_LIKE:-} " in
 esac
 echo "$PRETTY_NAME ($FAMILY family)"
 grep -qi microsoft /proc/version || die "this does not look like WSL2"
-ls "$HERE"/patches/aquamarine-*.patch >/dev/null 2>&1 && [ -f "$HERE/hyprland-wsl" ] ||
+ls "$HERE"/patches/headless-drm*.patch >/dev/null 2>&1 && [ -f "$HERE/hyprland-wsl" ] ||
     die "run install.sh from a clone of the repository"
 modinfo vgem >/dev/null 2>&1 || die "the WSL kernel has no vgem module; update WSL with 'wsl --update'"
 [ -d /mnt/wslg ] || echo "warning: WSLg not found; the viewer window will not work, use 'hyprland-wsl --no-viewer'"
@@ -69,7 +69,7 @@ arch)
     pacman-key --populate
     # A full upgrade, because Arch does not support installing onto a partly updated system.
     pacman -Syu --noconfirm --needed \
-        hyprland foot mesa labwc wayvnc tigervnc wlr-randr sudo ttf-dejavu curl \
+        hyprland foot mesa wayvnc tigervnc sudo ttf-dejavu curl \
         base-devel cmake ninja hyprwayland-scanner wayland-protocols
     ;;
 debian)
@@ -78,7 +78,7 @@ debian)
     apt-get install -y --no-install-recommends curl ca-certificates
     apt-cache show hyprland >/dev/null 2>&1 || add_ppa
     apt-get install -y --no-install-recommends \
-        hyprland foot labwc wayvnc tigervnc-viewer wlr-randr sudo fonts-dejavu-core \
+        hyprland foot wayvnc tigervnc-viewer sudo fonts-dejavu-core \
         libgl1-mesa-dri libegl1 libgles2 xkb-data \
         curl ca-certificates patch build-essential cmake ninja-build pkg-config \
         hyprwayland-scanner libhyprutils-dev libwayland-dev wayland-protocols libseat-dev \
@@ -106,7 +106,7 @@ syslib=$(ldconfig -p | awk '/libaquamarine\.so\.[0-9]+ / { print $NF; exit }')
 [ -n "$syslib" ] || die "libaquamarine is not installed; the hyprland package should have pulled it in"
 srcver=$(basename "$(readlink -f "$syslib")")
 srcver=${srcver#libaquamarine.so.}
-stamp="$srcver $(cat "$HERE"/patches/aquamarine-*.patch | sha256sum | cut -d' ' -f1)"
+stamp="$srcver $(cat "$HERE"/patches/headless-drm*.patch | sha256sum | cut -d' ' -f1)"
 if [ "$(cat $PREFIX/aquamarine/STAMP 2>/dev/null)" = "$stamp" ]; then
     echo "already built for aquamarine $srcver"
 else
@@ -116,7 +116,7 @@ else
     src=$build/aquamarine-$srcver
     # The patch exists in one variant per layout of the patched file; use the one that fits.
     applied=
-    for p in "$HERE"/patches/aquamarine-*.patch; do
+    for p in "$HERE"/patches/headless-drm*.patch; do
         if patch -d "$src" -p1 --dry-run -s -f < "$p" >/dev/null 2>&1; then
             patch -d "$src" -p1 -s < "$p"
             applied=$(basename "$p")

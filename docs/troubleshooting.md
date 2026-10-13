@@ -1,5 +1,9 @@
 # Troubleshooting
 
+> **Not yet updated.** This page still describes the earlier stack, where Hyprland ran nested
+> inside labwc (branch `main`). The current stack has no labwc, no `wlr-randr` and no redirected
+> render node; see [how-it-works.md](how-it-works.md). The scripts are the reference.
+
 Problems that came up while this was built and tested, with their causes. Entries marked
 *(expected)* describe likely situations that were not reproduced.
 

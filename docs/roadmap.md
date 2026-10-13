@@ -1,68 +1,71 @@
 # Status and roadmap
 
-Where the project stands and what is still to do. Last updated 2026-10-11.
+Where the project stands and what is still to do. Last updated 2026-10-13.
 
 ## Works
 
-- Hyprland in a window on the Windows desktop, on Arch, CachyOS, Kali, Ubuntu 26.04 and
-  Linux Mint 22.3.
-- One installer for pacman- and apt-based distros, one launcher.
-- Keyboard and mouse. Checked by hand in the WSLg window on Ubuntu, and by a scripted VNC client
-  on Kali, Ubuntu, Mint and CachyOS (Super+Q opens a terminal, typed text arrives).
-- A Windows-side launcher that shows the session with a viewer running on Windows.
-- Screen size and scale can be chosen at launch, up to 3840x2160.
-- Clean shutdown when the viewer is closed.
+Checked on Kali with a clean install on 2026-10-13, by scripts (a VNC client, `hyprctl`,
+screenshots); nobody has sat in front of this version yet.
+
+- Hyprland on its own headless backend, with no second compositor underneath.
+- Rendering on the GPU through Mesa's Direct3D 12 driver, chosen automatically, with the CPU as
+  fallback (`--software` forces it; if the GPU attempt fails to start, the launcher retries on
+  the CPU).
+- 60 updates a second at 1920x1080 at a scripted VNC client, with the whole screen changing.
+- Wayland apps, including OpenGL apps drawing on the GPU (glmark2), a GTK app (Thunar), and X11
+  apps through XWayland (xclock, glxgears).
+- Keyboard through VNC (Super+Q opens a terminal), screen size and scale at launch.
+- One installer for pacman- and apt-based distros, one launcher, a Windows-side launcher.
+- Clean shutdown.
+
+Also tried on Ubuntu 26.04, from a side-by-side build: starts on GPU and CPU.
 
 ## Known gaps
 
 | Gap | Notes |
 | --- | --- |
-| Windows key capture is unconfirmed | The Windows-side launcher starts the viewer full screen with system-key capture switched on. That the Windows key really reaches Hyprland has to be confirmed at a real keyboard. |
-| High CPU on Ubuntu 26.04 | About three cores while a viewer is connected. Hyprland 0.53 redraws for every capture. |
-| XWayland apps are unverified | Hyprland reports XWayland starting in the session; no X11 app was run. |
-| Software rendering only | No GPU acceleration. Smooth at 2560x1440 (about 33 updates a second during animations, 18 ms from key press to screen, measured through VNC). At 3840x2160 the renderer is saturated and it lags, so real 4K needs GPU acceleration. Full screen on a 4K display therefore renders at the 100 % size and lets Windows enlarge it. |
-| Fixed screen size | Chosen at launch; resizing the viewer window does not resize Hyprland. |
-| Keyboard layout | Not taken from Windows; has to be set in the Hyprland config. |
+| Not seen by a person | Everything above was measured remotely. How it looks and feels in the WSLg window and in the full-screen Windows viewer is unchecked for this version. |
+| Frame rate at TigerVNC's viewer | Not measured: neither the Windows nor the Linux viewer reports one, and the Windows one would not close on request. While it was connected, wayvnc used about two thirds of one core at 1920x1080 with the whole screen changing. |
+| Windows key capture is unconfirmed | As before: needs a real keyboard. |
+| Arch, CachyOS, Mint | Not rerun with this version. The installer changes are small (package list, patch), but untested there. |
+| GPU coverage | One NVIDIA card. Other vendors, and machines where WSL has no GPU, are untested; the "no GPU" case was only simulated by making `/dev/dxg` unreadable. |
+| Xwayland draws on the CPU in GPU mode | Its own GPU path makes it exit at start, so it is run with `-glamor off`. Cause not investigated. |
+| waybar did not appear | Started in the test session and showed nothing. Not investigated; it may only need its usual configuration. |
+| Ubuntu 26.04 | Monitor reports 0.06 Hz; slow on the CPU. Low priority. |
+| Fixed screen size | Chosen at launch. |
+| Keyboard layout | Not taken from Windows. |
 | Start-up notices | Two harmless notices on every start. |
-| No mouse pointer in the captured picture | The viewer draws its own pointer. Whether that looks right in every viewer is unchecked. |
+| VNC | Still a copy and an encode per frame. A purpose-built Windows client is the idea for later. |
+| Docs | `manual-setup.md` and `troubleshooting.md` still describe the earlier stack. |
 
 ## To do
 
+Next:
+
+- [ ] Someone looks at it: WSLg window, full-screen Windows viewer, the Windows key
+- [ ] Rerun Arch, CachyOS and Mint with this version
+- [ ] Rewrite `manual-setup.md` and `troubleshooting.md`
+- [ ] Higher targets than 1920x1080 at 60: 2560x1440 and 3840x2160 through the real viewer
+
 Distros:
 
-- [ ] Ubuntu 24.04 (expected to work like Mint 22.3)
-- [ ] Debian
-- [ ] Fedora (needs a dnf branch)
-- [ ] openSUSE Tumbleweed (needs a zypper branch)
-
-Testing:
-
-- [x] Real typing and mouse use through the WSLg window on Ubuntu 26.04
-- [x] Scripted keyboard test through VNC on Kali, Ubuntu, Mint, CachyOS
-- [ ] The Windows key through the Windows-side launcher, at a real keyboard
-- [ ] The WSLg window appearing on the desktop on Arch, CachyOS, Kali and Mint (confirmed on Ubuntu)
-- [ ] An XWayland app
-- [ ] Installing and launching as a non-root user (all tests ran as root)
-- [ ] `git clone` inside the distro, as the README describes
-- [ ] The `tools/` command lines exactly as written in the README
-- [ ] Clean-instance installer runs for CachyOS and Mint
+- [ ] Ubuntu 24.04, Debian
+- [ ] Fedora (needs a dnf branch), openSUSE Tumbleweed (needs a zypper branch)
 
 Features:
 
-- [x] A Windows-side launcher (`windows\hyprland-wsl.cmd`)
-- [x] Size and scale for high-resolution displays
+- [ ] A Windows client of our own in place of VNC (shared frames, keyboard capture in a window,
+      resizing, keyboard layout, clipboard)
 - [ ] Decide the default main modifier: ALT (works everywhere) or SUPER (needs the Windows viewer)
-- [ ] A Start menu or desktop shortcut that runs the Windows-side launcher
+- [ ] A Start menu or desktop shortcut
 - [ ] One-line install once the repository is public
-- [ ] Resizable screen
 - [ ] A starter config shared by all distros
-- [ ] Fix or work around the Ubuntu CPU use (newer Hyprland or wayvnc there)
-- [ ] GPU acceleration, if a route exists
+- [ ] A Hyprland-like tiling window manager for native Windows apps (separate, later)
 
 Project:
 
+- [ ] Merge this branch into `main` once it has been seen working
 - [ ] Choose a license
-- [ ] Report the aquamarine fixes upstream, which would make the patched build unnecessary
-- [ ] Decide on the PPA: keep it opt-in, or stop recommending it
-- [ ] Decide whether the Arch installer may run a full system upgrade without asking
-- [ ] Remove or trim the working notes (`claude-context.md`, `dev-log/`) before going public
+- [ ] Report the headless-backend change to hyprwm/aquamarine
+- [ ] Decide on the PPA, and on the unprompted `pacman -Syu`
+- [ ] Remove or trim the working notes (`claude-context.md`, `dev-log/`, `probes/`) before going public
