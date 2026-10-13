@@ -62,6 +62,13 @@ add_ppa() {
     apt-cache show hyprland >/dev/null 2>&1 || die "the PPA did not provide a hyprland package"
 }
 
+# A root filesystem imported from a hand-made tarball can end up with / readable by root only.
+# Nothing then works for a regular user, and the failure shows up far from its cause.
+if [ "$(stat -c %a /)" = 700 ]; then
+    echo "warning: / has mode 700, which locks every regular user out; setting it to 755"
+    chmod 755 /
+fi
+
 step "Installing packages"
 case $FAMILY in
 arch)

@@ -19,17 +19,16 @@ The aim is to support all major Linux distributions under WSL2.
 
 ## Supported distros
 
-With WSL 2.5.9. The current version was tested on 2026-10-13 on Kali (clean install) and tried
-on Ubuntu 26.04; the other three were last tested on 2026-10-11 with the earlier version and
-have not been rerun:
+With WSL 2.5.9. Arch, CachyOS, Kali and Mint were tested on 2026-10-13 with clean installs;
+Ubuntu 26.04 was tried from a side-by-side build:
 
 | Distro | Hyprland | Comes from | Notes |
 | --- | --- | --- | --- |
-| Arch Linux | 0.56.2 | distro repos | |
-| CachyOS | 0.56.2 | distro repos | no WSL image, see [Distros without a WSL image](#distros-without-a-wsl-image) |
-| Kali Linux (rolling) | 0.56.2 | distro repos | |
-| Ubuntu 26.04 | 0.53.3 | distro repos | older Hyprland with the `hyprland.conf` config format |
-| Linux Mint 22.3 | 0.56.2 | third-party PPA | no WSL image; Mint has no Hyprland package of its own |
+| Arch Linux | 0.56.2 | distro repos | GPU |
+| CachyOS | 0.56.2 | distro repos | GPU; no WSL image, see [Distros without a WSL image](#distros-without-a-wsl-image) |
+| Kali Linux (rolling) | 0.56.2 | distro repos | GPU |
+| Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format |
+| Linux Mint 22.3 | 0.56.2 | third-party PPA | CPU only (its Mesa is too old for the GPU path); no WSL image; Mint has no Hyprland package of its own |
 
 Other Arch-based and Debian/Ubuntu-based distros may work, since the installer goes by package
 family, but only the ones above were tried. Ubuntu 24.04 should behave like Mint 22.3 (same base)
@@ -87,7 +86,7 @@ hyprland-wsl --port 5901
 ```
 
 It draws on the GPU when WSL exposes one (`/dev/dxg`) and the distro's Mesa has the Direct3D 12
-driver, otherwise on the CPU, and says which when it starts:
+driver and is version 26 or newer, otherwise on the CPU, and says which when it starts:
 
 ```
 Hyprland is running at 1920x1080, rendering on the GPU (VNC on 127.0.0.1:5900).
@@ -199,7 +198,8 @@ More in [docs/how-it-works.md](docs/how-it-works.md).
 ## Performance
 
 Measured on 2026-10-13 on Kali, with an RTX 4060, at 1920x1080, by a scripted VNC client counting
-the updates it receives:
+the updates it receives. Arch and CachyOS gave the same figures within one update a second; Mint,
+on the CPU, reached 53 a second with the scrolling terminal:
 
 | What is on screen | GPU | CPU |
 | --- | --- | --- |
@@ -212,8 +212,9 @@ The frame rate at TigerVNC's own viewer has not been measured; that viewer does 
 ## Limitations
 
 - The picture goes through VNC, which costs a copy and an encode per frame.
-- GPU rendering needs a GPU that WSL exposes and a Mesa built with the Direct3D 12 driver. It was
-  tested with one NVIDIA card only.
+- GPU rendering needs a GPU that WSL exposes and Mesa 26 or newer built with the Direct3D 12
+  driver. It was tested with one NVIDIA card only. With Mesa 25.2 (Linux Mint 22.3) the viewer
+  stays blank in GPU mode, so the launcher uses the CPU there; `--gpu` overrides that.
 - On the CPU, animations and blur cost CPU in proportion to the screen size.
 - In the WSLg window on a high-resolution display, things are small unless a larger size and
   `--scale` are given. The Windows-side launcher picks both from the display.

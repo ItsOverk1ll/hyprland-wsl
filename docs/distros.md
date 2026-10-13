@@ -3,10 +3,10 @@
 What was found on each distro with WSL 2.5.9 (kernel 6.6.87.2). Versions are what the distros
 shipped on 2026-10-11 and will move.
 
-The current stack (Hyprland on its headless backend, GPU rendering) was tested on 2026-10-13 on
-**Kali** with a clean install, and tried on **Ubuntu 26.04** from a side-by-side build. Arch,
-CachyOS and Mint were tested with the earlier labwc-based stack only (branch `main`); their
-notes below are from then.
+The current stack (Hyprland on its headless backend, GPU rendering) was tested on 2026-10-13
+with clean installs on **Arch, CachyOS, Kali and Mint**, and tried on **Ubuntu 26.04** from a
+side-by-side build. Mesa on that day: 26.2.4 on Arch and CachyOS, 26.1.6 on Kali, 26.0.8 on
+Ubuntu, 25.2.8 on Mint.
 
 | | Arch | CachyOS | Kali rolling | Ubuntu 26.04 | Linux Mint 22.3 |
 | --- | --- | --- | --- | --- | --- |
@@ -63,6 +63,16 @@ notes below are from then.
   third-party PPA `ppa:cppiber/hyprland` and asks first.
 - The PPA also upgrades some system libraries (libinput, libxkbcommon, libdisplay-info).
 - The `mint23-amd64` image is a pre-release without a package repository. Do not use it yet.
+- **CPU rendering only.** In GPU mode Hyprland runs and takes input, but the picture never
+  reaches the viewer: capture requests through the `wlr-screencopy` protocol, which Mint's
+  wayvnc (0.7.2) and grim use, are never answered. Kali's newer clients use
+  `ext-image-copy-capture` and Ubuntu 26.04 captures fine through `wlr-screencopy` with Mesa 26,
+  so Mint's Mesa 25.2.8 is the suspect; that was not proven. The launcher uses the CPU when
+  Mesa is older than 26.
+- Its Xwayland (23.2.6) has no `-glamor off`; the launcher uses `-shm` there.
+- A root filesystem made with an older `tools/merge-layers.sh` has `/` at mode 700, and then
+  nothing works for a regular user ("unable to execute /usr/bin/env: Permission denied"). The
+  installer now sets it to 755 and says so.
 
 ## Not covered yet
 

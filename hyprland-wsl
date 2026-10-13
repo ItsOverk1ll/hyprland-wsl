@@ -170,18 +170,29 @@ if [ "$GPU" = auto ]; then
     for d in /usr/lib/*/dri /usr/lib/dri /usr/lib64/dri; do
         [ -e /dev/dxg ] && [ -e "$d/d3d12_dri.so" ] && GPU=1
     done
+    # With Mesa 25.2 (Linux Mint 22.3) screen capture through wlr-screencopy never completes on
+    # this driver, so the viewer stays blank. Mesa 26 is fine. Older than that: CPU unless asked.
+    mesa=$(ls /usr/lib/*/libgallium-*.so /usr/lib/libgallium-*.so /usr/lib64/libgallium-*.so 2>/dev/null | sed -n 's/.*libgallium-\([0-9]*\)\..*/\1/p' | sort -n | tail -n 1)
+    if [ "$GPU" = 1 ] && [ "${mesa:-0}" -lt 26 ]; then
+        GPU=0
+        echo "hyprland-wsl: Mesa ${mesa:-of unknown version} is older than 26; rendering on the CPU (--gpu to try the GPU anyway)" >&2
+    fi
 fi
 DRIVER=
 if [ "$GPU" = 1 ]; then
     DRIVER=GALLIUM_DRIVER=d3d12
     # Xwayland's own GPU drawing does not survive this setup (it exits at start), so Hyprland is
     # given a wrapper that switches it off. X11 apps still draw with the GPU themselves.
+    # The option for that is "-glamor off" from Xwayland 23.1 on some builds and "-shm" on others.
     XW=$(command -v Xwayland)
+    XWOPT=
     if [ -n "$XW" ]; then
+        if "$XW" -help 2>&1 | grep -q -- '-glamor'; then XWOPT="-glamor off"
+        elif "$XW" -help 2>&1 | grep -q -- '-shm'; then XWOPT="-shm"; fi
+    fi
+    if [ -n "$XWOPT" ]; then
         mkdir -p /run/hyprland-wsl/bin
-        printf '#!/bin/sh
-exec %s "$@" -glamor off
-' "$XW" > /run/hyprland-wsl/bin/Xwayland
+        printf '#!/bin/sh\nexec %s "$@" %s\n' "$XW" "$XWOPT" > /run/hyprland-wsl/bin/Xwayland
         chmod 755 /run/hyprland-wsl/bin/Xwayland
         DRIVER="$DRIVER PATH=/run/hyprland-wsl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     fi
@@ -227,7 +238,9 @@ if [ -n "$SCALE" ]; then
 fi
 
 # Hyprland never names its socket wayland-0.
-as WAYLAND_DISPLAY=wayland-1 wayvnc --max-fps="$FPS" ${HYPRLAND_WSL_WAYVNC_OPTS:-} 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
+# wayvnc gets the same driver as Hyprland. Older wayvnc versions capture into GPU buffers of
+# their own, and Hyprland can only fill those if both sides use the same driver.
+as WAYLAND_DISPLAY=wayland-1 $DRIVER wayvnc --max-fps="$FPS" ${HYPRLAND_WSL_WAYVNC_OPTS:-} 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
 wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
 # Say what is really drawing: the Direct3D 12 libraries are loaded only if that driver came up.
 HPID=$(pgrep -u "$U" -x Hyprland | head -n 1)
