@@ -22,7 +22,7 @@ offers that).
 - One installer for pacman- and apt-based distros, one launcher, a Windows-side launcher.
 - Clean shutdown.
 
-Also tried on Ubuntu 26.04, from a side-by-side build: starts on GPU and CPU.
+Ubuntu 26.04 passes the same checks from a clean install, with lower frame rates (see the gaps).
 
 ## Known gaps
 
@@ -36,12 +36,11 @@ Also tried on Ubuntu 26.04, from a side-by-side build: starts on GPU and CPU.
 | GPU coverage | One NVIDIA card. Other vendors, and machines where WSL has no GPU, are untested; the "no GPU" case was only simulated by making `/dev/dxg` unreadable. |
 | Xwayland draws on the CPU in GPU mode | Its own GPU path makes it exit at start, so it is run with `-glamor off`. Cause not investigated. |
 | waybar did not appear | Started in the test session and showed nothing. Not investigated; it may only need its usual configuration. |
-| Ubuntu 26.04 | Monitor reports 0.06 Hz; slow on the CPU. Low priority. |
+| Ubuntu 26.04 is less smooth | 64 and 50 updates a second on the GPU in the two frame-rate tests, 39 with four apps at once, and 3 to 4 on the CPU. Its aquamarine 0.10 does not pace headless frames, which is the suspect. Low priority. |
 | Fixed screen size | Chosen at launch. |
 | Keyboard layout | Not taken from Windows. |
 | Start-up notices | Two harmless notices on every start. |
 | VNC | Still a copy and an encode per frame. A purpose-built Windows client is the idea for later. |
-| Docs | `manual-setup.md` and `troubleshooting.md` still describe the earlier stack. |
 
 ## To do
 
@@ -51,7 +50,7 @@ Next:
 - [ ] Still unseen: the WSLg window, and the Windows key as modifier
 - [x] Rerun Arch, CachyOS and Mint with this version
 - [x] Mint on the GPU: works with Mesa 26 from the kisak-mesa PPA, offered by the installer
-- [ ] Rewrite `manual-setup.md` and `troubleshooting.md`
+- [x] Rewrite `manual-setup.md` and `troubleshooting.md`
 - [ ] Higher targets than 1920x1080 at 60: 2560x1440 and 3840x2160 through the real viewer
 
 Distros:
@@ -71,8 +70,8 @@ Features:
 
 Project:
 
-- [ ] Merge this branch into `main` once it has been seen working
+- [x] Merge the headless stack into `main` (2026-10-13)
 - [ ] Choose a license
 - [ ] Report the headless-backend change to hyprwm/aquamarine
 - [ ] Decide on the PPA, and on the unprompted `pacman -Syu`
-- [ ] Remove or trim the working notes (`claude-context.md`, `dev-log/`, `probes/`) before going public
+- [ ] Remove or trim the working notes (`claude-context.md`, `dev-log/`) before going public

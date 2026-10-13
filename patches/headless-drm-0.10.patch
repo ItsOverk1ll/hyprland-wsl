@@ -110,7 +110,7 @@ diff -ruN a/src/backend/Headless.cpp b/src/backend/Headless.cpp
 +    const char* mode = getenv("AQ_HEADLESS_MODE");
 +    if (mode && sscanf(mode, "%dx%d", &w, &h) == 2 && w > 0 && h > 0)
 +        size = {(double)w, (double)h};
-+    output->modes.emplace_back(SP<SOutputMode>(new SOutputMode(size, 60, true)));
++    output->modes.emplace_back(SP<SOutputMode>(new SOutputMode(size, 60000, true)));
      output->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
      output->self      = output;
      backend->events.newOutput.emit(SP<IOutput>(output));

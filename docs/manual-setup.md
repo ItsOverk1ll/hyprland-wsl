@@ -1,9 +1,5 @@
 # Setting it up by hand
 
-> **Not yet updated.** This page still describes the earlier stack, where Hyprland ran nested
-> inside labwc (branch `main`). The current stack has no labwc, no `wlr-randr` and no redirected
-> render node; see [how-it-works.md](how-it-works.md). The scripts are the reference.
-
 What `install.sh` and the `hyprland-wsl` launcher do, as individual steps. Use this to understand
 the scripts, to adapt them to a distro they do not cover, or to debug a step that fails.
 
@@ -21,7 +17,7 @@ Arch, CachyOS:
 
 ```sh
 pacman-key --init && pacman-key --populate
-pacman -Syu --needed hyprland foot mesa labwc wayvnc tigervnc wlr-randr sudo ttf-dejavu curl \
+pacman -Syu --needed hyprland foot mesa wayvnc tigervnc sudo ttf-dejavu curl \
     base-devel cmake ninja hyprwayland-scanner wayland-protocols
 ```
 
@@ -30,7 +26,7 @@ Kali, Ubuntu 26.04:
 ```sh
 apt-get update
 apt-get install --no-install-recommends \
-    hyprland foot labwc wayvnc tigervnc-viewer wlr-randr sudo fonts-dejavu-core \
+    hyprland foot wayvnc tigervnc-viewer sudo fonts-dejavu-core \
     libgl1-mesa-dri libegl1 libgles2 xkb-data \
     curl ca-certificates patch build-essential cmake ninja-build pkg-config \
     hyprwayland-scanner libhyprutils-dev libwayland-dev wayland-protocols libseat-dev \
@@ -43,16 +39,38 @@ then install the list above. It is your decision whether to trust that PPA.
 
 ```sh
 . /etc/os-release
-fp=$(curl -fsSL https://api.launchpad.net/1.0/~cppiber/+archive/ubuntu/hyprland |
-    sed -n 's/.*"signing_key_fingerprint": "\([0-9A-F]*\)".*/\1/p')
-mkdir -p /etc/apt/keyrings
-curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$fp" -o /etc/apt/keyrings/hyprland-wsl-ppa.asc
-echo "deb [signed-by=/etc/apt/keyrings/hyprland-wsl-ppa.asc] https://ppa.launchpadcontent.net/cppiber/hyprland/ubuntu $UBUNTU_CODENAME main" \
-    > /etc/apt/sources.list.d/hyprland-wsl-ppa.list
+add_ppa() {     # add_ppa OWNER/NAME FILE
+    fp=$(curl -fsSL "https://api.launchpad.net/1.0/~${1%/*}/+archive/ubuntu/${1#*/}" |
+        sed -n 's/.*"signing_key_fingerprint": "\([0-9A-F]*\)".*/\1/p')
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$fp" -o "/etc/apt/keyrings/$2.asc"
+    echo "deb [signed-by=/etc/apt/keyrings/$2.asc] https://ppa.launchpadcontent.net/$1/ubuntu $UBUNTU_CODENAME main" \
+        > "/etc/apt/sources.list.d/$2.list"
+}
+add_ppa cppiber/hyprland hyprland-wsl-ppa
 apt-get update
 ```
 
-### 2. A user
+### 2. A newer Mesa, where needed
+
+Rendering on the GPU needs Mesa 26 or newer. Check what is installed:
+
+```sh
+ls /usr/lib/*/libgallium-*.so /usr/lib/libgallium-*.so 2>/dev/null
+```
+
+Linux Mint 22.x and Ubuntu 24.04 ship 25.2, with which the viewer stays blank in GPU mode. A
+second third-party PPA has a current one. Skip this to render on the CPU instead.
+
+```sh
+add_ppa kisak/kisak-mesa hyprland-wsl-mesa
+apt-get update
+apt-get install --no-install-recommends \
+    $(dpkg-query -W -f='${binary:Package}\n' 'libgl1-mesa-dri*' 'libegl-mesa0*' 'libgbm1*' \
+        'libgbm-dev*' 'libglx-mesa0*' 'libglapi-mesa*' 'mesa-*' 'libegl1-mesa-dev*' 2>/dev/null)
+```
+
+### 3. A user
 
 Hyprland should not run as root. If the distro has no regular user:
 
@@ -60,7 +78,14 @@ Hyprland should not run as root. If the distro has no regular user:
 useradd -m -s /bin/bash USER
 ```
 
-### 3. The patched aquamarine
+That user has no password and no `sudo` rights. To have both inside the session:
+
+```sh
+passwd USER
+usermod -aG sudo USER      # the group is called wheel on Arch-based distros
+```
+
+### 4. The patched aquamarine
 
 It has to be the exact version Hyprland was built against, which is the version of the installed
 library:
@@ -77,8 +102,8 @@ Download that version, patch and build it:
 cd "$(mktemp -d)"
 curl -fsSL "https://github.com/hyprwm/aquamarine/archive/refs/tags/v$ver.tar.gz" | tar xz
 cd "aquamarine-$ver"
-patch -p1 < CLONE/patches/aquamarine-wayland-nested.patch        # 0.14 and later
-# patch -p1 < CLONE/patches/aquamarine-wayland-nested-0.10.patch # 0.10.x
+patch -p1 < CLONE/patches/headless-drm.patch          # 0.14 and later
+# patch -p1 < CLONE/patches/headless-drm-0.10.patch   # 0.10.x
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/opt/hyprland-wsl/aquamarine -DCMAKE_INSTALL_LIBDIR=lib
 cmake --build build
@@ -87,7 +112,7 @@ cmake --install build
 
 To see which patch fits without changing anything, add `--dry-run` to the `patch` command.
 
-### 4. A Hyprland config
+### 5. A Hyprland config
 
 Hyprland writes its default config when asked to check a missing one. As `USER`:
 
@@ -98,7 +123,8 @@ Hyprland --verify-config
 That creates `~/.config/hypr/hyprland.lua` (Hyprland 0.55 and later) or
 `~/.config/hypr/hyprland.conf` (older). Changes worth making for WSL:
 
-- Main modifier `ALT` instead of `SUPER`. Windows keeps the Windows key for itself.
+- Main modifier `ALT` instead of `SUPER`, unless you only use the Windows-side launcher in full
+  screen. In the WSLg window, Windows keeps the Windows key for itself.
 - Terminal `foot` instead of `kitty`, unless you install kitty.
 - Monitor scale `1`. Automatic scaling picked 2 in testing.
 - Remove the `autogenerated` line, or Hyprland shows a banner about it.
@@ -112,9 +138,6 @@ This is the launcher, step by step. `R` is the user's runtime directory.
 ```sh
 modprobe vgem
 ls -l /sys/class/drm/                  # find the card whose device link ends in /vgem, e.g. card0
-cat /sys/class/drm/card0/dev           # its numbers, e.g. 226:0
-rm -f /dev/dri/renderD128
-mknod /dev/dri/renderD128 c 226 0      # render node path, primary node's numbers
 chmod 666 /dev/dri/card0 /dev/dri/renderD128
 ```
 
@@ -128,10 +151,10 @@ rm -rf "$R/hypr" "$R"/wayland-* "$R/wayvncctl"
 
 ### 3. The mount namespace
 
-`lib` is the system library path from part 1, step 3.
+`lib` is the system library path from part 1, step 4.
 
 ```sh
-mkdir -p /tmp/.X11-unix
+mkdir -p /tmp/.X11-unix /run/hyprland-wsl/x11
 unshare -m --propagation private sh -c '
     mount --bind "$1" "$2" || exit 1
     mount --bind /tmp/.X11-unix /run/hyprland-wsl/x11 || exit 1      # keep WSLg sockets reachable
@@ -144,8 +167,6 @@ unshare -m --propagation private sh -c '
 NS=$!
 ```
 
-(`mkdir -p /run/hyprland-wsl/x11` first.)
-
 Everything below that says `in-ns` means: run it as `USER` inside that namespace, with a clean
 environment:
 
@@ -156,49 +177,49 @@ nsenter -t $NS -m --wd=/home/USER sudo -u USER env -u WAYLAND_DISPLAY -u DISPLAY
 
 `LP_NUM_THREADS` caps the software renderer's threads; see [how-it-works.md](how-it-works.md).
 
-### 4. The host compositor
+### 4. Hyprland
 
-A config directory for labwc, for example `~/.config/hyprland-wsl/labwc/rc.xml`:
-
-```xml
-<?xml version="1.0"?>
-<labwc_config>
-  <core><decoration>client</decoration></core>
-  <windowRules>
-    <windowRule identifier="*" serverDecoration="no"><action name="Maximize"/></windowRule>
-  </windowRules>
-</labwc_config>
-```
+On the CPU:
 
 ```sh
-in-ns WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_LIBINPUT_NO_DEVICES=1 \
-    labwc -C /home/USER/.config/hyprland-wsl/labwc &
-# wait for $R/wayland-0 to appear, then set the screen size:
-in-ns WAYLAND_DISPLAY=wayland-0 wlr-randr --output HEADLESS-1 --custom-mode 1600x900
+in-ns AQ_HEADLESS_DRM_DEVICE=/dev/dri/card0 AQ_HEADLESS_MODE=1920x1080 Hyprland &
+# wait for $R/wayland-1 to appear (Hyprland never uses wayland-0)
 ```
 
-### 5. Hyprland
+On the GPU, add the Direct3D 12 driver and an Xwayland that does not use its own GPU drawing.
+The wrapper adds `-glamor off`, or `-shm` on Xwayland versions without that option
+(`Xwayland -help` lists them):
 
 ```sh
-in-ns WAYLAND_DISPLAY=wayland-0 Hyprland &
-# wait for $R/wayland-1 to appear
+mkdir -p /run/hyprland-wsl/bin
+printf '#!/bin/sh\nexec /usr/bin/Xwayland "$@" -glamor off\n' > /run/hyprland-wsl/bin/Xwayland
+chmod 755 /run/hyprland-wsl/bin/Xwayland
+in-ns AQ_HEADLESS_DRM_DEVICE=/dev/dri/card0 AQ_HEADLESS_MODE=1920x1080 GALLIUM_DRIVER=d3d12 \
+    PATH=/run/hyprland-wsl/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin Hyprland &
 ```
 
-`wayland-0` is labwc, `wayland-1` is Hyprland.
-
-### 6. VNC and the viewer
-
-wayvnc attaches to Hyprland (`wayland-1`), not to the host:
+To see which one is drawing, look for the Direct3D 12 library in the process:
 
 ```sh
-in-ns WAYLAND_DISPLAY=wayland-1 wayvnc 127.0.0.1 5900 &
+grep -c libd3d12 /proc/$(pgrep -u USER -x Hyprland | head -n 1)/maps    # 0 means the CPU
 ```
 
-To change Hyprland's scale for this session (Lua config, then `hyprland.conf` versions):
+If Hyprland exits at once in GPU mode, start it the CPU way; the launcher does that by itself.
+
+### 5. VNC and the viewer
 
 ```sh
-hyprctl eval 'hl.monitor({ output = "WAYLAND-1", mode = "3840x2160@60", position = "0x0", scale = 2 })'
-hyprctl keyword monitor WAYLAND-1,3840x2160@60,0x0,2
+in-ns WAYLAND_DISPLAY=wayland-1 wayvnc --max-fps=60 127.0.0.1 5900 &
+```
+
+In GPU mode give wayvnc the same `GALLIUM_DRIVER=d3d12`.
+
+To change Hyprland's scale for this session (Lua config, then `hyprland.conf` versions; the
+monitor name is the one `hyprctl monitors` shows):
+
+```sh
+hyprctl eval 'hl.monitor({ output = "HEADLESS-1", mode = "2560x1440@60", position = "0x0", scale = 1.25 })'
+hyprctl keyword monitor HEADLESS-1,2560x1440@60,0x0,1.25
 ```
 
 A viewer on Windows can connect to `127.0.0.1:5900` at this point. The viewer inside WSL runs
@@ -209,10 +230,10 @@ outside the namespace, because it needs WSLg's X socket. It is called
 sudo -u USER env DISPLAY=:0 HOME=/home/USER vncviewer -RemoteResize=0 127.0.0.1::5900
 ```
 
-### 7. Stopping
+### 6. Stopping
 
 ```sh
-pkill -u USER -x Hyprland; pkill -u USER -x wayvnc; pkill -u USER -x labwc
+pkill -u USER -x Hyprland; pkill -u USER -x wayvnc
 pkill -9 -u USER -x Hyprland     # a seat helper process stays behind on some distros
 kill $NS
 ```
@@ -225,5 +246,13 @@ As `USER`, with `XDG_RUNTIME_DIR` set to the runtime directory:
 export HYPRLAND_INSTANCE_SIGNATURE=$(ls "$XDG_RUNTIME_DIR/hypr" | head -n 1)
 hyprctl monitors
 hyprctl clients
-WAYLAND_DISPLAY=wayland-0 grim shot.png      # screenshot of the host, needs the grim package
+WAYLAND_DISPLAY=wayland-1 grim shot.png      # screenshot, needs the grim package
+```
+
+From any machine that can reach the port, `tools/vnc-probe.py` does what a viewer would:
+
+```sh
+python3 tools/vnc-probe.py 5900 shot shot.png      # a screenshot through VNC
+python3 tools/vnc-probe.py 5900 fps 10             # updates per second while something moves
+python3 tools/vnc-probe.py 5900 latency 10         # key press to screen
 ```

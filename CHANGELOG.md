@@ -1,0 +1,126 @@
+# Changelog
+
+What changed, newest first. The project has no version numbers yet, so entries go by date.
+
+## 2026-10-13: Hyprland on its own, drawn by the GPU
+
+The stack lost a layer and gained GPU rendering. Hyprland no longer runs inside a second
+compositor, and where WSL exposes a GPU it now draws with it.
+
+```
+before:  vgem, labwc, Hyprland (CPU), wayvnc, viewer
+now:     vgem, Hyprland (GPU or CPU), wayvnc, viewer
+```
+
+Measured at 1920x1080 on an RTX 4060 by a scripted VNC client, the same on Arch, CachyOS, Kali
+and Mint within one update a second (Ubuntu 26.04 is lower, see the known limits). Drawing on
+the CPU was the only way before:
+
+| What is on screen | On the CPU | On the GPU |
+| --- | --- | --- |
+| A 3D scene filling the screen | 6 updates a second | 60 updates a second |
+| A scrolling terminal, full screen | 55 a second, Hyprland using about 2.3 CPU cores | 60 a second, about a sixth of one core |
+
+### Added
+
+- **GPU rendering** through Mesa's Direct3D 12 driver. The launcher chooses it automatically
+  when WSL exposes a GPU and Mesa is version 26 or newer, and prints what it chose:
+  `Hyprland is running at 1920x1080, rendering on the GPU`. Apps inside the session draw on the
+  GPU too.
+- **`--software` and `--gpu`** to choose the renderer, and **`--fps N`** for the most frames a
+  second sent to the viewer (default 60). On the Windows side: `-Software` and `-Fps`.
+- **Automatic fallback.** If Hyprland does not start on the GPU, the launcher starts it on the
+  CPU and says so.
+- **A current Mesa for Ubuntu 24.04-based distros** (Linux Mint 22.x). Their Mesa 25.2 leaves
+  the viewer blank in GPU mode. The installer offers the third-party `ppa:kisak/kisak-mesa`,
+  asks first (`HYPRLAND_MESA_PPA=1` answers yes), and upgrades only Mesa's packages.
+- **X11 apps in GPU mode.** Xwayland is started so that it works alongside the Direct3D 12
+  driver.
+- **`tools/vnc-probe.py fps`**: updates per second and how evenly they arrive, measured the way
+  a viewer receives them. **`cursor`**: the pointer image a VNC server sends.
+- **`dev-log/scripts/71-suite.sh`**: every check in one run, for any distro.
+- This changelog.
+
+### Changed
+
+- **No host compositor.** aquamarine's headless backend is patched to open the vgem device
+  itself (`patches/headless-drm.patch`), which is the one thing labwc was there to provide.
+  labwc and wlr-randr are no longer installed or used.
+- **The patch is smaller and different.** The fixes for aquamarine's nested Wayland backend are
+  gone, because that backend is no longer used.
+- **The render node is left alone.** The launcher used to replace `/dev/dri/renderD128` with a
+  copy of the primary node. Hyprland is now pointed at the primary node directly.
+- **Default screen size** is 1920x1080 (was 1600x900).
+- **The viewer may receive 60 frames a second.** wayvnc's own limit of 30 applied before.
+- **Docs** rewritten for the new stack: README, how it works, distro notes, setting it up by
+  hand, troubleshooting, roadmap.
+
+### Fixed
+
+- **A black square on the mouse pointer** in the Windows viewer. The server sends a fully
+  transparent pointer image, which Windows draws as an opaque square; the launcher now asks the
+  viewer for its dot cursor instead. A small dot at the pointer's tip remains.
+- **Leaving full screen** is Ctrl+Alt+Enter in TigerVNC 1.16. The docs said F8, which was the
+  key in older versions.
+- **`--scale` on Ubuntu 26.04.** The launcher now asks Hyprland for the monitor's name instead
+  of assuming it.
+- **The monitor's refresh rate on Ubuntu 26.04** reads 60 Hz. aquamarine 0.10 reported 0.06 Hz
+  for a headless output.
+- **Installing into a root filesystem that only root can enter** (`/` with mode 700, as a
+  hand-built Mint image had). The installer repairs it and says so.
+
+### Removed
+
+- labwc, wlr-randr and the nested-backend patches (`aquamarine-wayland-nested*.patch`).
+
+### Tested
+
+Clean installs on fresh instances of Arch, CachyOS, Kali, Linux Mint 22.3 and Ubuntu 26.04, each
+through the full suite: start-up, frame rate on GPU and CPU, X11 apps, the CPU fallback, scale,
+several apps at once. Arch, CachyOS, Kali and Mint were also used by hand through the Windows
+viewer.
+
+### Known limits
+
+- The picture still goes through VNC: a copy and an encode per frame.
+- One NVIDIA card was tested. Other GPUs are untested.
+- Ubuntu 26.04, with Hyprland 0.53 and aquamarine 0.10, is less smooth than the others: 50 to
+  64 updates a second on the GPU in the same tests, and 3 to 4 on the CPU.
+- Linux Mint needs two third-party PPAs for the GPU path, and its old wayvnc (0.7) uses most of
+  one CPU core at 1920x1080 when the whole screen changes.
+- The frame rate at TigerVNC's own viewer was not measured; it does not report one.
+
+## 2026-10-11: four more distros, keyboard capture, lower CPU use
+
+### Added
+
+- **Kali, Ubuntu 26.04, Linux Mint 22.3 and CachyOS**, next to Arch. One installer for pacman-
+  and apt-based distros; a second patch for aquamarine 0.10.
+- **Opt-in PPA for Hyprland** on Ubuntu 24.04-based distros (`HYPRLAND_PPA=1`).
+- **`tools/Get-DockerRootfs.ps1` and `tools/merge-layers.sh`**: import distros that only publish
+  Docker images (CachyOS, Mint) into WSL without Docker.
+- **A Windows-side launcher** (`windows\hyprland-wsl.cmd`): a viewer running on Windows, full
+  screen, with the whole keyboard captured, so that the Windows key can be Hyprland's modifier.
+- **`--scale N`** and **`hyprland-wsl set-mod SUPER|ALT`**.
+- **`tools/vnc-probe.py`**: a dependency-free VNC client for scripted tests.
+- **`docs/`**: how it works, distro notes, manual setup, troubleshooting, roadmap.
+
+### Changed
+
+- **A private mount namespace** for the session: the patched library is mounted over the system
+  one (`LD_LIBRARY_PATH` is ignored for Hyprland on Debian-family distros), and `/tmp/.X11-unix`
+  is a fresh directory.
+- **wayvnc attaches to Hyprland**, not to the host compositor: keys no longer pass the host's
+  own shortcuts, and old host versions no longer render continuously.
+- **Mesa's software renderer is capped at 4 threads**, which cut CPU use many times over.
+- **Full screen on a scaled display** renders at the unscaled size and lets Windows enlarge it.
+
+### Fixed
+
+- **The viewer window opened inside the session** instead of on the Windows desktop.
+
+## 2026-10-10: first version
+
+- Hyprland on Arch Linux under WSL2: `install.sh`, the `hyprland-wsl` launcher, and a patch for
+  aquamarine's nested Wayland backend, with labwc as a headless host and wayvnc plus TigerVNC to
+  show the picture.

@@ -4,9 +4,9 @@ What was found on each distro with WSL 2.5.9 (kernel 6.6.87.2). Versions are wha
 shipped on 2026-10-11 and will move.
 
 The current stack (Hyprland on its headless backend, GPU rendering) was tested on 2026-10-13
-with clean installs on **Arch, CachyOS, Kali and Mint**, and tried on **Ubuntu 26.04** from a
-side-by-side build. Mesa on that day: 26.2.4 on Arch and CachyOS, 26.1.6 on Kali, 26.0.8 on
-Ubuntu, 25.2.8 on Mint.
+with clean installs on **Arch, CachyOS, Kali, Mint and Ubuntu 26.04**. Mesa on that day: 26.2.4
+on Arch and CachyOS, 26.1.6 on Kali, 26.0.8 on Ubuntu, 25.2.8 on Mint (26.2.4 after the upgrade
+the installer offers).
 
 | | Arch | CachyOS | Kali rolling | Ubuntu 26.04 | Linux Mint 22.3 |
 | --- | --- | --- | --- | --- | --- |
@@ -45,10 +45,17 @@ Ubuntu, 25.2.8 on Mint.
 - Hyprland 0.53.3, which is noticeably older: it uses the `hyprland.conf` format, not Lua, and
   logs nothing unless asked to (see [troubleshooting.md](troubleshooting.md)).
 - aquamarine 0.10.0 needs its own patch file (`headless-drm-0.10.patch`).
-- Works on the GPU and on the CPU. On the CPU it is slow to react (about 130 ms from key to
-  screen, against 8 ms on the GPU).
-- The monitor reports 0.06 Hz. aquamarine 0.10 gives the headless output a refresh rate of 60
-  where later versions give 60000 (the unit is mHz). Not looked into further.
+- Works, but is the least smooth of the five. On the GPU at 1920x1080: 64 updates a second
+  with a full-screen 3D scene, 50 with a scrolling terminal, 39 with four apps at once, 10 ms
+  from key to screen. On the CPU it is close to unusable at that size: 3 to 4 updates a second.
+  The others hold 60 on the GPU and about 55 on the CPU with the scrolling terminal.
+- A likely reason: aquamarine 0.10's headless output does not pace its frames (its source has a
+  "FIXME: limit fps" at that spot), so Hyprland redraws as fast as it can. Not confirmed, and
+  not worked on; Ubuntu is low priority for now.
+- `glxgears` through XWayland ran at 6 frames a second there, against 130 to 140 elsewhere.
+- The monitor is called `HEADLESS-2`, not `HEADLESS-1`. The launcher asks Hyprland for the name.
+- aquamarine 0.10 gives the headless output a refresh rate of 60 where the unit is mHz, which
+  Hyprland showed as 0.06 Hz. The patch sets 60000.
 
 ## Linux Mint 22.3
 

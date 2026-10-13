@@ -16,18 +16,18 @@ The aim is to support all major Linux distributions under WSL2.
 - [Setting it up by hand](docs/manual-setup.md): the installer and launcher as individual steps
 - [Troubleshooting](docs/troubleshooting.md): error messages and what to do about them
 - [Status and roadmap](docs/roadmap.md): what works, known gaps, what is planned
+- [Changelog](CHANGELOG.md): what changed and when
 
 ## Supported distros
 
-With WSL 2.5.9. Arch, CachyOS, Kali and Mint were tested on 2026-10-13 with clean installs;
-Ubuntu 26.04 was tried from a side-by-side build:
+Tested on 2026-10-13 with WSL 2.5.9, each with a clean install:
 
 | Distro | Hyprland | Comes from | Notes |
 | --- | --- | --- | --- |
 | Arch Linux | 0.56.2 | distro repos | GPU |
 | CachyOS | 0.56.2 | distro repos | GPU; no WSL image, see [Distros without a WSL image](#distros-without-a-wsl-image) |
 | Kali Linux (rolling) | 0.56.2 | distro repos | GPU |
-| Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format |
+| Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format, and less smooth than the others (see [distro notes](docs/distros.md)) |
 | Linux Mint 22.3 | 0.56.2 | third-party PPA | GPU with a newer Mesa from a second PPA, otherwise CPU; no WSL image; Mint has no Hyprland package of its own |
 
 Other Arch-based and Debian/Ubuntu-based distros may work, since the installer goes by package
@@ -66,6 +66,9 @@ The installer:
 - writes a default Hyprland config if there is none, with ALT as the main modifier and foot as
   the terminal
 
+A user the installer creates has no password and no `sudo` rights. To have them inside the
+session, run `passwd hypr` and `usermod -aG sudo hypr` as root (`wheel` on Arch-based distros).
+
 ### The PPAs on Ubuntu 24.04-based distros
 
 Linux Mint 22.x and Ubuntu 24.04 have no `hyprland` package. The installer then offers to add the
@@ -87,6 +90,7 @@ hyprland-wsl                    # 1920x1080 window
 hyprland-wsl 1600x900           # another size
 hyprland-wsl 2560x1440 --scale 1.25 # larger screen, everything drawn a quarter bigger
 hyprland-wsl --software         # draw on the CPU even if a GPU is available
+hyprland-wsl --fps 30           # send the viewer at most 30 frames a second (default 60)
 hyprland-wsl --no-viewer        # no window; connect a VNC client to 127.0.0.1:5900
 hyprland-wsl --port 5901
 ```
@@ -141,6 +145,7 @@ cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
 | ALT+Q | terminal |
 | ALT+C | close window |
 | ALT+V | toggle floating |
+| ALT+arrow keys | move focus |
 | ALT+1..0 | switch workspace |
 | ALT+M | exit Hyprland |
 
@@ -205,7 +210,8 @@ More in [docs/how-it-works.md](docs/how-it-works.md).
 
 Measured on 2026-10-13 on Kali, with an RTX 4060, at 1920x1080, by a scripted VNC client counting
 the updates it receives. Arch, CachyOS and Mint (with Mesa 26) gave the same figures within one
-update a second:
+update a second. Ubuntu 26.04, with its older Hyprland, reached 64 and 50 on the GPU and is very
+slow on the CPU:
 
 | What is on screen | GPU | CPU |
 | --- | --- | --- |
