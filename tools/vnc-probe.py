@@ -9,6 +9,7 @@ It sees and does what a real viewer would: takes screenshots, moves the pointer,
   vnc-probe.py PORT key super+q             press a key combination
   vnc-probe.py PORT type "hello"            type text
   vnc-probe.py PORT hold SECONDS            stay connected, requesting updates (for load tests)
+  vnc-probe.py PORT cursor                  the pointer image the server sends to viewers
   vnc-probe.py PORT latency N               time from a key press to the screen changing
   vnc-probe.py PORT fps SECONDS             screen updates per second and their spacing (start something
                                             moving first)
@@ -212,6 +213,40 @@ def main():
                          100.0 * pixels / n / (v.w * v.h)))
             else:
                 print("no updates in %.0f s" % secs)
+            return
+        elif cmd == "cursor":
+            # what pointer image does the server hand to a viewer that draws the pointer itself?
+            v.s.sendall(struct.pack(">BxHii", 2, 2, 0, -239))     # encodings: raw, cursor
+            v.pointer(v.w // 2, v.h // 2); time.sleep(0.3); v.pointer(v.w // 2 + 5, v.h // 2 + 5)
+            v.s.settimeout(3)
+            found = False
+            try:
+                for _ in range(6):
+                    v.s.sendall(struct.pack(">BBHHHH", 3, 0 if _ == 0 else 1, 0, 0, v.w, v.h))
+                    while v.read(1)[0] != 0:
+                        pass
+                    v.read(1)
+                    for _r in range(struct.unpack(">H", v.read(2))[0]):
+                        x, y, w, h, enc = struct.unpack(">HHHHi", v.read(12))
+                        if enc == -239:
+                            px = v.read(w * h * 4); mask = v.read(((w + 7) // 8) * h)
+                            shown = sum(bin(b).count("1") for b in mask)
+                            dark = sum(1 for i in range(0, len(px), 4) if px[i] < 16 and px[i + 1] < 16 and px[i + 2] < 16)
+                            print("pointer image %dx%d, hotspot %d,%d: %d of %d pixels visible, %d of all pixels black"
+                                  % (w, h, x, y, shown, w * h, dark))
+                            found = True
+                        elif enc == 0:
+                            left = w * h * 4
+                            while left:
+                                left -= len(v.read(min(left, 1 << 20)))
+                        else:
+                            sys.exit("unexpected encoding %d" % enc)
+                    if found:
+                        break
+            except socket.timeout:
+                pass
+            if not found:
+                print("the server sent no pointer image")
             return
         elif cmd == "wait":
             time.sleep(float(a.pop(0)))

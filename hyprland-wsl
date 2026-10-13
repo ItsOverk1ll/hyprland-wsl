@@ -256,7 +256,11 @@ if [ $VIEWER = 1 ]; then
     # WSLg's X server shows this as an ordinary window on the Windows desktop.
     [ -S /tmp/.X11-unix/X0 ] || die "WSLg display not found; use --no-viewer and connect a VNC client to 127.0.0.1:$PORT"
     [ -n "$VNCVIEWER" ] || die "no TigerVNC viewer found; use --no-viewer"
-    sudo -u "$U" env DISPLAY=:0 HOME="$H" "$VNCVIEWER" -RemoteResize=0 "127.0.0.1::$PORT" > $LOG/viewer.log 2>&1
+    # Hyprland draws the pointer into the picture and the server sends an empty pointer image.
+    # Newer viewers then draw a dot of their own on top; switch that off where the option exists.
+    NODOT=
+    "$VNCVIEWER" -h 2>&1 | grep -q AlwaysCursor && NODOT=-AlwaysCursor=0
+    sudo -u "$U" env DISPLAY=:0 HOME="$H" "$VNCVIEWER" -RemoteResize=0 $NODOT "127.0.0.1::$PORT" > $LOG/viewer.log 2>&1
 else
     wait $HYPR
 fi
