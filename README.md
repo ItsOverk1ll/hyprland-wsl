@@ -163,7 +163,7 @@ PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu wit
 | Enter | start full screen (on a distro without hyprland-wsl: offer to install it) |
 | Ctrl+W | start in a window |
 | Ctrl+T | stop the distro |
-| Ctrl+D | remove the distro (`wsl --unregister`; asks you to type its name first) |
+| Ctrl+D | remove the distro completely (asks you to type its name first; see below) |
 | Ctrl+R | rescan every distro |
 | Esc | close |
 
@@ -175,6 +175,12 @@ from their Docker images (see [Distros without a WSL image](#distros-without-a-w
 Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks nothing: it
 installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
 Omarchy's own setup.
+
+Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing else is in it,
+its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
+`-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if
+any. The menu lists all of it before you confirm. Terminal's settings are backed up to
+`%LOCALAPPDATA%\hyprland-wslackups` first. Without the menu: `.\windowsemove-distro.ps1 -Name NAME`.
 
 The same works without the menu:
 

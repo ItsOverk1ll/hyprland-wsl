@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = $OutputEncoding = [Text.UTF8Encoding]::new($false)
 $env:WSL_UTF8 = 1
 . (Join-Path $PSScriptRoot 'common.ps1')
+. (Join-Path $PSScriptRoot 'remove-distro.ps1')
 # Sent to each distro on stdin, so it works wherever the checkout is.
 $infoScript = (Get-Content (Join-Path $repo 'tools\distro-info.sh') -Raw) -replace "`r", ''
 $dataDir = Join-Path $env:LOCALAPPDATA 'hyprland-wsl'
@@ -270,17 +271,13 @@ function New-Distro($distros) {
 
 function Remove-Distro($d) {
     Clear-Host
-    $key = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss |
-        Where-Object { (Get-ItemProperty $_.PSPath).DistributionName -eq $d.Name } | Select-Object -First 1
-    $base = if ($key) { (Get-ItemProperty $key.PSPath).BasePath -replace '^\\\\\?\\', '' }
-    Write-Host "`n  ${warn}Remove $($d.Name)?$reset"
-    Write-Host "  ${dim}This unregisters it: its disk$(if ($base) { " in $base" }) and everything in it$reset"
-    Write-Host "  ${dim}are deleted for good. Type the name to confirm, or Enter to keep it.$reset`n"
+    $l = Get-DistroLeftovers $d.Name
+    Write-Host "`n  ${warn}Remove $($d.Name)?$reset  ${dim}This deletes for good:$reset"
+    foreach ($w in Format-Leftovers $l) { Write-Host "  ${dim}- $w$reset" }
+    Write-Host "`n  ${dim}Type the name to confirm, or Enter to keep it.$reset`n"
     Write-Host "  ${accent}Name$reset${accent} >$reset " -NoNewline
     if ([Console]::ReadLine().Trim() -cne $d.Name) { return $false }
-    wsl.exe --unregister $d.Name | Out-Host
-    # wsl leaves the folder; remove it when nothing else is in it.
-    if ($base -and (Test-Path $base) -and -not (Get-ChildItem $base -Force)) { Remove-Item $base }
+    try { Remove-DistroCompletely $l } catch { Write-Host "  ${warn}$($_.Exception.Message)$reset"; Start-Sleep 3 }
     Start-Sleep 1
     $true
 }

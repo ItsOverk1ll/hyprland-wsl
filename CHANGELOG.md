@@ -14,8 +14,10 @@ What changed, newest first. The project has no version numbers yet, so entries g
   first-run account prompt. Omarchy goes straight to its installer and its own setup.
 - `windows\new-distro.ps1`, the same from the command line, and `tools/new-distro-setup.sh`,
   the part that runs inside the new distro.
-- **Ctrl+D** in the menu removes a distro (`wsl --unregister`, after typing its name), and
-  its folder when nothing else is in it.
+- **Ctrl+D** in the menu removes a distro completely, after you type its name: the distro
+  (`wsl --unregister`), its folder when empty, its Windows Terminal profiles (WSL's and ones
+  you made that start it), and the Microsoft Store app it was installed from. Terminal's
+  settings are backed up first. `windowsemove-distro.ps1` does the same from the command line.
 
 ### Fixed
 
