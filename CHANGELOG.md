@@ -2,6 +2,14 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: Getting started
+
+### Added
+
+- [docs/getting-started.md](docs/getting-started.md), for readers who have never used Linux or a
+  terminal: what this is, what you need, the one-line install, what you will see, the keyboard
+  basics, and how to remove it, with places for screenshots. Linked first in the README.
+
 ## 2026-10-15: The keyboard card
 
 ### Added

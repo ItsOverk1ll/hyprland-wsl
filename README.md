@@ -1,5 +1,8 @@
 # hyprland-wsl
 
+> **New to Linux or terminals? Start with [Getting started](docs/getting-started.md).** It takes
+> you from here to a Linux desktop on your Windows PC in about 15 minutes, one step at a time.
+
 Run [Hyprland](https://hypr.land) inside WSL2, in a window on the Windows desktop.
 
 Hyprland does not run under WSL out of the box: WSL has no display device it can drive, and
@@ -34,6 +37,7 @@ everything. You can [read the script](windows/bootstrap.ps1) first.
 
 ## Documentation
 
+- [Getting started](docs/getting-started.md): for newcomers, from nothing to a desktop, no Linux knowledge needed
 - [How it works](docs/how-it-works.md): why Hyprland needs help under WSL and what each part does
 - [Distro guides](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems): installing each distro, with its notes (Operating-Systems branch)
 - [Setting it up by hand](docs/manual-setup.md): the installer and launcher as individual steps
