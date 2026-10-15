@@ -2,6 +2,17 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: A launcher menu
+
+### Added
+
+- **`windows\launcher.cmd`**, a menu of your WSL distros in the terminal (fzf, styled like
+  BetterHotkeys' menus and following its theme). It shows each distro's system, Hyprland
+  version, user and whether it renders on the GPU; Enter starts it full screen, Ctrl+W in a
+  window, Ctrl+T stops it. Distros without hyprland-wsl offer to install it, and a top row
+  makes a new Omarchy instance.
+- `tools/distro-info.sh`, what the menu asks each distro.
+
 ## 2026-10-15: Omarchy's first-boot setup
 
 ### Added

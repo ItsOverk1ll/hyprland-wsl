@@ -140,6 +140,29 @@ hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
 - `-Size 2560x1440`, `-Scale 1.5` and `-Port` override the defaults.
 - A few keys never leave Windows, such as Ctrl+Alt+Del and Win+L.
 
+### A menu of your distros
+
+`windows\launcher.cmd` opens a menu in the terminal that lists every WSL distro, shows which
+ones have hyprland-wsl and what they render on, and starts the one you pick:
+
+```powershell
+.\windows\launcher.cmd
+```
+
+| Key | Action |
+| --- | --- |
+| Enter | start full screen (on a distro without hyprland-wsl: offer to install it) |
+| Ctrl+W | start in a window |
+| Ctrl+T | stop the distro |
+| Ctrl+R | rescan every distro |
+| Esc | close |
+
+The top row, **+ New Omarchy instance**, runs `install-omarchy.ps1` with a name and folder you
+choose. The menu needs fzf (`winget install junegunn.fzf`). It looks at each distro once, by
+starting it, and remembers the answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours
+follow the current BetterHotkeys theme when that is installed,
+and Omarchy's Hackerman otherwise.
+
 Default keys (the installed config uses ALT as the main modifier, because the WSLg window
 cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
 
