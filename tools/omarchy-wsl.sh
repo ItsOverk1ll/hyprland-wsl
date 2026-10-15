@@ -12,17 +12,24 @@
 # It stops once and asks for the instance to be restarted (exit code 75); run it again after
 # that. windows\install-omarchy.ps1 does all of this in one go.
 #
-# Environment:
-#   OMARCHY_USER       the user to create (default: omarchy)
+# By default no user is created: the first start shows Omarchy's own first-boot setup
+# (keyboard, account, hostname, timezone), as a machine installed from the ISO "for another
+# owner" does. See tools/omarchy-wsl-first-start.sh.
+#
+# Environment, for an install without that setup:
+#   OMARCHY_USER       the user to create now
 #   OMARCHY_PASSWORD   that user's password, also asked for by Omarchy's lock screen
 #                      (default: the same as the user name; change it with passwd)
 
 set -uo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-U=${OMARCHY_USER:-omarchy}
+U=${OMARCHY_USER:-}
 PASS=${OMARCHY_PASSWORD:-$U}
+# Setup mode: the user is created by Omarchy's first-boot setup at the first start.
+SETUP=0; [ -z "$U" ] && SETUP=1
 KEY=40DFB630FF42BCFFB047046CF0134EE680CAC571      # Omarchy <pkgs@omarchy.org>
+PROVISIONING=/var/lib/omarchy/provisioning
 
 die() { echo "error: $*" >&2; exit 1; }
 step() { printf '\n==> %s\n' "$*"; }
@@ -58,14 +65,18 @@ pacman -S --noconfirm --needed omarchy-keyring sudo || die "could not install om
 step "Omarchy's settings, the user, Omarchy itself"
 # omarchy-settings fills /etc/skel, so it has to be installed before the user is created.
 pacman -S --noconfirm --needed omarchy-settings || die "could not install omarchy-settings"
-if ! id "$U" > /dev/null 2>&1; then
+if [ $SETUP = 1 ]; then
+    echo "no user yet: Omarchy's setup creates it at the first start"
+elif ! id "$U" > /dev/null 2>&1; then
     useradd -m -G wheel -s /bin/bash "$U" || die "could not create user $U"
     echo "$U:$PASS" | chpasswd
     echo "created user $U"
 fi
 # Omarchy's setup calls sudo as the user. Removed again at the end.
-echo "$U ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/00-omarchy-wsl-install
-chmod 440 /etc/sudoers.d/00-omarchy-wsl-install
+if [ $SETUP = 0 ]; then
+    echo "$U ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/00-omarchy-wsl-install
+    chmod 440 /etc/sudoers.d/00-omarchy-wsl-install
+fi
 pacman -S --noconfirm --needed omarchy || die "could not install omarchy"
 echo "Omarchy $(pacman -Q omarchy | cut -d" " -f2)"
 
@@ -127,36 +138,6 @@ for s in sddm.service ufw.service NetworkManager.service systemd-resolved.servic
 done
 systemctl mask systemd-resolved.service > /dev/null 2>&1
 ufw disable > /dev/null 2>&1
-# Omarchy's desktop shell and its way of starting apps need the user's systemd session, which
-# normally comes with logging in.
-loginctl enable-linger "$U"
-# The packages just installed replaced systemd under the running one; without this the user's
-# session cannot be started until the instance is restarted.
-systemctl daemon-reexec
-systemctl start "user@$(id -u "$U").service"
-for _ in $(seq 50); do [ -S "/run/user/$(id -u "$U")/bus" ] && break; sleep 0.2; done
-if [ ! -S "/run/user/$(id -u "$U")/bus" ]; then
-    cat >&2 <<EOF
-
-The instance has to be restarted before the rest can run: the packages just installed
-replaced systemd, and the user's session does not start under the old one.
-In PowerShell:
-
-    wsl -t ${WSL_DISTRO_NAME:-<instance>}
-
-Then run this script again. It picks up where it stopped. (windows\install-omarchy.ps1 does
-both by itself.)
-EOF
-    exit 75
-fi
-# Omarchy starts apps through uwsm, which by default moves each new process into a scope of
-# the user's systemd session. That move is refused here, because Hyprland was not started
-# from inside that session, and nothing would open. Started as services, apps are created by
-# the session itself and no move is needed.
-sudo -u "$U" mkdir -p "/home/$U/.config/environment.d"
-echo 'UWSM_APP_UNIT_TYPE=service' | sudo -u "$U" tee "/home/$U/.config/environment.d/50-hyprland-wsl.conf" > /dev/null
-systemctl restart "user@$(id -u "$U").service"
-for _ in $(seq 50); do [ -S "/run/user/$(id -u "$U")/bus" ] && break; sleep 0.2; done
 # Omarchy's Power Off and Restart call systemctl as the user. That normally needs an active
 # login session, which a session started by hyprland-wsl is not, so they were refused
 # ("interactive authentication required") and nothing happened. Allowed for the desktop's
@@ -172,38 +153,104 @@ polkit.addRule(function (action, subject) {
     }
 });
 EOF
-# "wsl -d <instance>" should open as the user, not as root.
-if ! grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
-    printf '\n[user]\ndefault=%s\n' "$U" >> /etc/wsl.conf
-fi
 
-step "Omarchy's per-user setup"
-R=/run/user/$(id -u "$U")
-sudo -u "$U" -i env OMARCHY_PATH=/usr/share/omarchy PATH="/usr/share/omarchy/bin:/usr/local/bin:/usr/bin" \
-    XDG_RUNTIME_DIR="$R" DBUS_SESSION_BUS_ADDRESS="unix:path=$R/bus" \
-    omarchy-provision-user --force || die "Omarchy's per-user setup failed"
-# A first install counts every shipped migration as already applied.
-sudo -u "$U" bash -c 'mkdir -p ~/.local/state/omarchy/migrations
-    for m in /usr/share/omarchy/migrations/*.sh; do [ -f "$m" ] && touch ~/.local/state/omarchy/migrations/"$(basename "$m")"; done'
-# Omarchy assumes a high-density laptop screen and draws everything twice the size. The
-# session here has the size the launcher is given, so start at scale 1; change it from
-# Omarchy's menu (Setup > Monitors) or with the launcher's --scale.
-sudo -u "$U" sed -i -e 's/^local omarchy_monitor_scale = .*/local omarchy_monitor_scale = 1/' \
-    -e 's/^local omarchy_gdk_scale = .*/local omarchy_gdk_scale = 1/' "/home/$U/.config/hypr/monitors.lua"
+# Per-user settings WSL needs, written into a home directory. In setup mode they go into
+# /etc/skel, from which Omarchy's setup creates the new user's home.
+wsl_user_settings() {    # wsl_user_settings HOME OWNER
+    local h=$1 owner=$2
+    # Omarchy starts apps through uwsm, which by default moves each new process into a scope
+    # of the user's systemd session. That move is refused here, because Hyprland was not
+    # started from inside that session, and nothing would open. Started as services, apps
+    # are created by the session itself and no move is needed.
+    mkdir -p "$h/.config/environment.d"
+    echo 'UWSM_APP_UNIT_TYPE=service' > "$h/.config/environment.d/50-hyprland-wsl.conf"
+    # Omarchy assumes a high-density laptop screen and draws everything twice the size. The
+    # session here has the size the launcher is given, so start at scale 1; change it from
+    # Omarchy's menu (Setup > Monitors) or with the launcher's --scale.
+    [ -f "$h/.config/hypr/monitors.lua" ] &&
+        sed -i -e 's/^local omarchy_monitor_scale = .*/local omarchy_monitor_scale = 1/' \
+            -e 's/^local omarchy_gdk_scale = .*/local omarchy_gdk_scale = 1/' "$h/.config/hypr/monitors.lua"
+    # Chromium (and the web apps Omarchy builds on it) asks the GPU driver for a kind of buffer
+    # that Mesa's Direct3D 12 driver does not hand out, and exits. Without its own GPU process
+    # it draws on the CPU and Hyprland still composes on the GPU.
+    local flags=$h/.config/chromium-flags.conf
+    if [ -f "$flags" ] && ! grep -q -- '--disable-gpu' "$flags"; then
+        printf '%s\n' '# hyprland-wsl: see docs/omarchy.md' '--disable-gpu' >> "$flags"
+    fi
+    [ "$owner" = root ] || chown -R "$owner": "$h/.config/environment.d" "$h/.config/hypr/monitors.lua" "$flags" 2> /dev/null
+    return 0
+}
 
-# Chromium (and the web apps Omarchy builds on it) asks the GPU driver for a kind of buffer
-# that Mesa's Direct3D 12 driver does not hand out, and exits. Without its own GPU process it
-# draws on the CPU and Hyprland still composes on the GPU.
-flags=/home/$U/.config/chromium-flags.conf
-if [ -f "$flags" ] && ! grep -q -- '--disable-gpu' "$flags"; then
-    printf '%s\n' '# hyprland-wsl: see docs/omarchy.md' '--disable-gpu' | sudo -u "$U" tee -a "$flags" > /dev/null
+if [ $SETUP = 1 ]; then
+    wsl_user_settings /etc/skel root
+    echo "WSL settings for new users written to /etc/skel"
+else
+    # Omarchy's desktop shell and its way of starting apps need the user's systemd session,
+    # which normally comes with logging in.
+    loginctl enable-linger "$U"
+    # The packages just installed replaced systemd under the running one; without this the
+    # user's session cannot be started until the instance is restarted.
+    systemctl daemon-reexec
+    systemctl start "user@$(id -u "$U").service"
+    for _ in $(seq 50); do [ -S "/run/user/$(id -u "$U")/bus" ] && break; sleep 0.2; done
+    if [ ! -S "/run/user/$(id -u "$U")/bus" ]; then
+        cat >&2 <<EOF
+
+The instance has to be restarted before the rest can run: the packages just installed
+replaced systemd, and the user's session does not start under the old one.
+In PowerShell:
+
+    wsl -t ${WSL_DISTRO_NAME:-<instance>}
+
+Then run this script again. It picks up where it stopped. (windows\\install-omarchy.ps1 does
+both by itself.)
+EOF
+        exit 75
+    fi
+    # "wsl -d <instance>" should open as the user, not as root.
+    if ! grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
+        printf '\n[user]\ndefault=%s\n' "$U" >> /etc/wsl.conf
+    fi
+
+    step "Omarchy's per-user setup"
+    R=/run/user/$(id -u "$U")
+    sudo -u "$U" -i env OMARCHY_PATH=/usr/share/omarchy PATH="/usr/share/omarchy/bin:/usr/local/bin:/usr/bin" \
+        XDG_RUNTIME_DIR="$R" DBUS_SESSION_BUS_ADDRESS="unix:path=$R/bus" \
+        omarchy-provision-user --force || die "Omarchy's per-user setup failed"
+    # A first install counts every shipped migration as already applied.
+    sudo -u "$U" bash -c 'mkdir -p ~/.local/state/omarchy/migrations
+        for m in /usr/share/omarchy/migrations/*.sh; do [ -f "$m" ] && touch ~/.local/state/omarchy/migrations/"$(basename "$m")"; done'
+    wsl_user_settings "/home/$U" "$U"
+    systemctl restart "user@$(id -u "$U").service"
 fi
 
 step "hyprland-wsl"
-HYPR_USER=$U bash "$HERE/install.sh" || die "the hyprland-wsl installer failed"
+if [ $SETUP = 1 ]; then
+    HYPR_USER=- bash "$HERE/install.sh" || die "the hyprland-wsl installer failed"
+    # The first start runs Omarchy's first-boot setup in the terminal. Omarchy would run it on
+    # the console at boot through its own service; that stays off, WSL has no console.
+    mkdir -p /etc/hyprland-wsl $PROVISIONING
+    install -m 755 "$HERE/tools/omarchy-wsl-first-start.sh" /etc/hyprland-wsl/first-start
+    touch $PROVISIONING/pending
+    systemctl disable omarchy-provision-owner.service > /dev/null 2>&1 || true
+else
+    HYPR_USER=$U bash "$HERE/install.sh" || die "the hyprland-wsl installer failed"
+fi
 rm -f /etc/sudoers.d/00-omarchy-wsl-install
 
 step "Done"
+if [ $SETUP = 1 ]; then
+    cat <<EOF
+Omarchy $(pacman -Q omarchy | cut -d" " -f2) is installed. The first start opens Omarchy's setup, where you choose the
+keyboard, your account, the hostname and the timezone:
+
+    windows\\hyprland-wsl.cmd -Distro ${WSL_DISTRO_NAME:-<instance>}
+
+Restart the instance first if this script was just run (wsl -t ${WSL_DISTRO_NAME:-<instance>}).
+Update with "omarchy update", not with pacman -Syu.
+EOF
+    exit 0
+fi
 cat <<EOF
 Omarchy $(pacman -Q omarchy | cut -d" " -f2) is installed for user "$U", password "$PASS" (change it: passwd $U).
 Omarchy's keys use the Windows key, which only reaches it through the Windows-side launcher

@@ -15,15 +15,24 @@ In PowerShell, in a clone of this repository:
 .\windows\install-omarchy.ps1
 ```
 
-That creates a new Arch Linux instance called `omarchy`, installs Omarchy into it, restarts
-it once part way through, and finishes. It downloads several gigabytes and takes about ten
-minutes on an SSD; the instance ends up at roughly 11 GB.
+That creates a new Arch Linux instance called `omarchy`, installs Omarchy into it (several
+gigabytes, about ten minutes on an SSD; the instance ends up at roughly 11 GB), and starts it.
 
-It creates a user `omarchy` with the password `omarchy` (the lock screen and `sudo` ask for
-it). To choose the names:
+The first start is Omarchy's own first-boot setup, the one a machine installed from Omarchy's
+USB stick "for another owner" shows when it is switched on: the Omarchy greeting, then your
+keyboard layout, your account (user name and password), name and email for git (both
+optional), the hostname and the timezone, a summary to confirm, and a progress bar while the
+account is created and set up. It runs in the terminal you started the installer from; when it
+is done, the desktop starts. Later starts go straight to the desktop.
+
+If the setup is left unfinished, the next start shows it again.
+
+Options:
 
 ```powershell
-.\windows\install-omarchy.ps1 -Name omarchy -User me -Password secret -Location C:\WSL\omarchy
+.\windows\install-omarchy.ps1 -Name omarchy2 -Location C:\WSL\omarchy2   # another instance, on a chosen drive
+.\windows\install-omarchy.ps1 -NoStart                                   # install only; the setup comes with the first start
+.\windows\install-omarchy.ps1 -NoSetup -User me -Password secret         # make the account now, no setup screens
 ```
 
 By hand, the same thing is:
@@ -31,8 +40,8 @@ By hand, the same thing is:
 ```powershell
 wsl --install archlinux --name omarchy
 wsl -d omarchy -u root -- bash /mnt/c/path/to/hyprland-wsl/tools/omarchy-wsl.sh
-wsl -t omarchy          # when the script asks for a restart
-wsl -d omarchy -u root -- bash /mnt/c/path/to/hyprland-wsl/tools/omarchy-wsl.sh
+wsl -t omarchy
+.\windows\hyprland-wsl.cmd -Distro omarchy      # runs the setup, then the desktop
 ```
 
 Use a new instance. The script turns the instance into Omarchy; it is not meant for an Arch
@@ -67,16 +76,25 @@ Update with `omarchy update`. Omarchy blocks a direct `pacman -Syu` on purpose.
 
 ## What the script does
 
-The ISO partitions a disk, installs packages from Omarchy's repository, then runs Omarchy's
-system setup and per-user setup. The script does the last three:
+The ISO partitions a disk, installs packages from Omarchy's repository, runs Omarchy's system
+setup, and either creates the user or, for a machine meant for another owner, leaves that to
+a setup on the first boot. The script does the same without the disk and boot parts:
 
 1. Adds Omarchy's package repository and its snapshot of Arch's repositories, and trusts
    Omarchy's signing key.
-2. Installs `omarchy-settings`, creates the user, installs `omarchy` and the base package list
-   the ISO installs.
-3. Runs Omarchy's system setup (`install/config`, login, post-install) and its per-user setup
-   (`omarchy-provision-user`).
-4. Runs this repository's `install.sh` for the user.
+2. Installs `omarchy-settings`, `omarchy` and the base package list the ISO installs.
+3. Runs Omarchy's system setup (`install/config`, login, post-install).
+4. Writes the WSL-specific per-user settings into `/etc/skel`, from which the new account's
+   home is made.
+5. Runs this repository's `install.sh` without a user, and arms the first-start setup:
+   `/var/lib/omarchy/provisioning/pending`, as Omarchy's ISO does, and
+   `/etc/hyprland-wsl/first-start` (`tools/omarchy-wsl-first-start.sh`).
+
+At the first start, the Windows launcher runs `hyprland-wsl first-start`, which runs Omarchy's
+`omarchy-provision-owner` in the terminal (its console-only parts switch themselves off there)
+and then does what WSL needs for the new account: the launcher's user, the user's systemd
+session without a login, and in `/etc/wsl.conf` the default user, the hostname and the
+timezone chosen in the setup (WSL would otherwise take both from Windows at every start).
 
 ## What is different from a real Omarchy
 
@@ -105,6 +123,12 @@ alone.
   entry, audio, the lock screen, `omarchy update`, theme switching.
 - Used by hand by the owner on 2026-10-15: Power Off and the pointer confirmed, started from a
   Windows Terminal command-palette action.
+- The first-start setup was tested on a clean install by a script that types the answers
+  (`dev-log/scripts/72-drive-first-start.py`): account, hostname and timezone came out as
+  chosen, and the desktop started as the new account. Not yet gone through by hand. A
+  keyboard layout other than English (US) was not tried.
+- The account gets the `wheel` group only. Omarchy's own installer records further groups
+  during its system setup (Docker's, for one); add them with `usermod -aG` if needed.
 - On first start a "Setup Wi-Fi" notice appears. There is no Wi-Fi to set up; WSL shares
   Windows' connection.
 - Bluetooth, Wi-Fi and power settings in the shell have nothing to talk to.

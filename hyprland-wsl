@@ -12,6 +12,7 @@ usage() {
     cat <<'EOF'
 Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--fps N] [--port N] [--gpu|--software] [--no-viewer]
        hyprland-wsl set-mod SUPER|ALT
+       hyprland-wsl first-start
 
   WIDTHxHEIGHT   size of the Hyprland screen (default 1920x1080)
   --scale N      Hyprland's monitor scale, e.g. 2 for a 3840x2160 screen (default: from the config)
@@ -22,6 +23,8 @@ Usage: hyprland-wsl [WIDTHxHEIGHT] [--scale N] [--fps N] [--port N] [--gpu|--sof
                  (default: the GPU if WSL exposes one and Mesa has the driver)
   --no-viewer    do not open a viewer window; connect any VNC client yourself
 
+  first-start    run the distro's first-start setup if it still has one to do (creating the
+                 user, for example); does nothing otherwise. Needs a terminal.
   set-mod        change the main modifier in the Hyprland config that install.sh wrote.
                  SUPER needs a viewer that captures the Windows key (see the README);
                  ALT works in every viewer.
@@ -29,6 +32,15 @@ EOF
 }
 
 case ${1:-} in -h|--help) usage; exit 0 ;; esac
+
+# A setup that has to run once before the first session, installed by a distro-specific setup
+# such as tools/omarchy-wsl.sh. It removes itself when done.
+FIRST_START=/etc/hyprland-wsl/first-start
+if [ "${1:-}" = first-start ]; then
+    [ -x $FIRST_START ] || exit 0
+    [ "$(id -u)" = 0 ] || exec sudo -- "$0" "$@"
+    exec $FIRST_START
+fi
 
 [ "$(id -u)" = 0 ] || exec sudo -- "$0" "$@"
 
@@ -63,6 +75,10 @@ die() { echo "hyprland-wsl: $*" >&2; exit 1; }
 
 [ -f $CONF ] || die "$CONF not found; run install.sh first"
 . $CONF
+if [ -z "${HYPR_USER:-}" ]; then
+    [ -x $FIRST_START ] && die "this distro is not set up yet; run 'hyprland-wsl first-start' in a terminal (the Windows launcher does it by itself)"
+    die "no user in $CONF; rerun install.sh"
+fi
 id "$HYPR_USER" >/dev/null 2>&1 || die "user '$HYPR_USER' from $CONF does not exist"
 
 if [ -n "$SETMOD" ]; then

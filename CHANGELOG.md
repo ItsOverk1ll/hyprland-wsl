@@ -2,6 +2,20 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: Omarchy's first-boot setup
+
+### Added
+
+- **Omarchy installs like a new machine.** `windows\install-omarchy.ps1` no longer makes an
+  account. It installs Omarchy the way its USB stick does "for another owner", and starts it:
+  the first start shows Omarchy's own first-boot setup in the terminal (greeting, keyboard,
+  account, git identity, hostname, timezone, summary, progress), then the desktop. `-NoSetup
+  -User -Password` keeps the old behaviour.
+- **`hyprland-wsl first-start`**, a hook for setups that have to run once in a terminal before
+  the first session. The Windows launcher calls it before every start; it does nothing once
+  the setup is done.
+- `install.sh` accepts `HYPR_USER=-`: no user yet.
+
 ## 2026-10-15: Power Off, and the pointer square
 
 ### Fixed

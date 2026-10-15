@@ -1,16 +1,21 @@
-# Creates an Arch Linux WSL instance and installs Omarchy with hyprland-wsl into it.
+# Creates an Arch Linux WSL instance, installs Omarchy with hyprland-wsl into it, and starts
+# it: the first start opens Omarchy's own setup (keyboard, account, hostname, timezone), as a
+# machine installed from Omarchy's USB stick for a new owner does on its first boot.
 #
-#   .\install-omarchy.ps1                         instance "omarchy", user "omarchy"
-#   .\install-omarchy.ps1 -Name omarchy2 -User me -Password secret
+#   .\install-omarchy.ps1                          instance "omarchy", setup on first start
+#   .\install-omarchy.ps1 -Name omarchy2 -Location C:\WSL\omarchy2
+#   .\install-omarchy.ps1 -User me -Password secret -NoSetup   account made now, no setup screen
 #
-# The work is done by tools/omarchy-wsl.sh inside the instance. That script needs the
-# instance restarted once, part way through; this wrapper does the restart and the second run.
+# The work is done by tools/omarchy-wsl.sh inside the instance. The instance is restarted once
+# part way through (the install replaces systemd); this wrapper handles that.
 
 param(
     [string] $Name = 'omarchy',
-    [string] $User = 'omarchy',
-    [string] $Password,                # default: the same as the user name
-    [string] $Location                 # folder for the instance's disk; default: WSL's own choice
+    [string] $Location,                # folder for the instance's disk; default: WSL's own choice
+    [switch] $NoSetup,                 # create the account now instead of in Omarchy's setup
+    [string] $User = 'omarchy',        # with -NoSetup
+    [string] $Password,                # with -NoSetup; default: the same as the user name
+    [switch] $NoStart                  # do not start it at the end
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,8 +36,10 @@ if ($existing -notcontains $Name) {
     Write-Host "Using the existing instance '$Name'."
 }
 
+$envArgs = @()
+if ($NoSetup) { $envArgs = @("OMARCHY_USER=$User", "OMARCHY_PASSWORD=$Password") }
 foreach ($attempt in 1..3) {
-    wsl.exe -d $Name -u root -- env "OMARCHY_USER=$User" "OMARCHY_PASSWORD=$Password" bash $script
+    wsl.exe -d $Name -u root -- env @envArgs bash $script
     if ($LASTEXITCODE -eq 0) { break }
     if ($LASTEXITCODE -ne 75) { throw "The Omarchy installer stopped with an error (exit code $LASTEXITCODE)." }
     Write-Host "`nRestarting the instance and continuing ..."
@@ -41,6 +48,11 @@ foreach ($attempt in 1..3) {
 }
 if ($LASTEXITCODE) { throw 'The Omarchy installer kept asking for a restart.' }
 
-# The default user set by the installer applies from the next start of the instance.
+# Restart the instance: the install replaced systemd, and settings in /etc/wsl.conf apply
+# from the next start.
 wsl.exe -t $Name | Out-Null
-Write-Host "`nStart it with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name"
+Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name"
+if (-not $NoStart) {
+    Write-Host 'Starting it now ...'
+    & (Join-Path $PSScriptRoot 'hyprland-wsl.ps1') -Distro $Name
+}

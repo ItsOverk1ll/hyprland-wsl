@@ -137,6 +137,12 @@ debian)
 esac
 
 step "Choosing the user"
+# HYPR_USER=- leaves the choice to a first-start setup (see the launcher's "first-start"):
+# the user does not exist yet, as on a machine set up for its future owner.
+if [ "${HYPR_USER:-}" = - ]; then
+    echo "no user yet; it is created by the first-start setup"
+    U= H=
+else
 U=${HYPR_USER:-${SUDO_USER:-}}
 [ "$U" = root ] && U=
 [ -n "$U" ] || U=$(awk -F: '$3 >= 1000 && $3 < 60000 { print $1; exit }' /etc/passwd)
@@ -147,6 +153,7 @@ if ! id "$U" >/dev/null 2>&1; then
 fi
 H=$(getent passwd "$U" | cut -d: -f6)
 echo "Hyprland will run as $U"
+fi
 
 step "Building the patched aquamarine"
 # The patched copy has to be the exact version Hyprland was built against, so the version
@@ -191,6 +198,9 @@ cc -shared -fPIC -O2 -o $PREFIX/lib/no-cursor-image.so "$HERE/src/no-cursor-imag
 echo "HYPR_USER=$U" > $CONF
 
 step "Preparing the Hyprland config"
+if [ -z "$U" ]; then
+    echo "skipped until the user exists"
+else
 lua=$H/.config/hypr/hyprland.lua
 conf=$H/.config/hypr/hyprland.conf
 if [ -e "$lua" ] || [ -e "$conf" ]; then
@@ -220,6 +230,8 @@ else
     else
         die "Hyprland did not generate a config in $H/.config/hypr"
     fi
+fi
+
 fi
 
 step "Done"
