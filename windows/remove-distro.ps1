@@ -14,7 +14,9 @@
 # The menu (launcher.ps1, Ctrl+D) uses Get-DistroLeftovers and Remove-DistroCompletely from here.
 
 param(
-    [string[]] $Name,
+    # Not called $Name: the menu dot-sources this file, and a typed $Name would turn its own
+    # $name into a list.
+    [Alias('Name')] [string[]] $DistroName,
     [switch] $Force,
     [switch] $ProfilesOnly
 )
@@ -110,7 +112,7 @@ function Format-Leftovers($leftovers) {
 if ($MyInvocation.InvocationName -eq '.') { return }   # dot-sourced: functions only
 
 $ErrorActionPreference = 'Stop'
-foreach ($n in $Name) {
+foreach ($n in $DistroName) {
     $l = Get-DistroLeftovers $n
     if ($ProfilesOnly) { $l.Exists = $false; $l.Base = $null; $l.Package = $null }
     $what = @(Format-Leftovers $l)

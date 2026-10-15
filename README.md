@@ -9,6 +9,20 @@ that screen in a window.
 
 The aim is to support all major Linux distributions under WSL2.
 
+## Install on Windows, in one line
+
+Open PowerShell (Start menu → type "PowerShell") and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/ItsOverk1ll/hyprland-wsl/main/windows/bootstrap.ps1 | iex
+```
+
+It checks WSL and installs it if needed (that needs one restart; paste the line again after
+it), installs PowerShell 7 and fzf, downloads hyprland-wsl to `%LOCALAPPDATA%\hyprland-wsl\repo`,
+adds the `hyprland-wsl` command, and opens the menu, where **+ New distro** installs a Linux
+system with Hyprland. It says what it changes before it starts. Running it again updates
+everything. You can [read the script](windows/bootstrap.ps1) first.
+
 ## Branches
 
 | Branch | What it is |

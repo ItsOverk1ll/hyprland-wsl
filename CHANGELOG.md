@@ -2,6 +2,25 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: One-line install for Windows
+
+### Added
+
+- **`windows\bootstrap.ps1`**: `irm https://raw.githubusercontent.com/ItsOverk1ll/hyprland-wsl/main/windows/bootstrap.ps1 | iex`
+  in Windows PowerShell 5.1 goes from nothing to the menu. It checks WSL (installs it with
+  `wsl --install --no-distribution` and explains the restart; updates an old built-in WSL; sets
+  WSL 2 as the default; says how to switch on virtualization when it is off), installs
+  PowerShell 7 and fzf with winget, downloads hyprland-wsl to `%LOCALAPPDATA%\hyprland-wsl\repo`
+  (git if installed, a zip otherwise; again to update), adds the `hyprland-wsl` command and
+  opens the menu. It lists what it may change at the start and what it did change at the end,
+  and stops with one plain sentence instead of an error code.
+
+### Fixed
+
+- The menu showed every distro's name as "System.String[]": `remove-distro.ps1`, which the menu
+  loads, declared a typed `$Name` parameter that took over the menu's own `$name`. The
+  parameter is now `-DistroName` (`-Name` still works).
+
 ## 2026-10-15: The menu is back on main
 
 ### Changed
