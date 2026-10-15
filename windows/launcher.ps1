@@ -65,7 +65,8 @@ function Get-Distros {
         if (-not $line) { return }
         $default = $line.StartsWith('*')
         $parts = ($line.TrimStart('*').Trim()) -split '\s+'
-        if ($parts.Count -ge 3) {
+        # Only table rows: with no distros installed, wsl prints a help text instead.
+        if ($parts.Count -eq 3 -and $parts[2] -match '^\d+$') {
             [pscustomobject]@{ Name = $parts[0]; State = $parts[1]; Version = $parts[2]; Default = $default }
         }
     } | Where-Object { $_.Name -notmatch '^docker-desktop' }
@@ -101,8 +102,9 @@ function Update-Cache($cache, $distros, [switch]$All) {
         }
         foreach ($f in $found) { $cache[$f.name] = $f.info }
     }
-    foreach ($gone in @($cache.Keys | Where-Object { $_ -notin $distros.Name })) { $cache.Remove($gone) }
-    if ($todo.Count -or $All) { Save-Cache $cache }
+    $gone = @($cache.Keys | Where-Object { $_ -notin $distros.Name })
+    foreach ($g in $gone) { $cache.Remove($g) }
+    if ($todo.Count -or $gone.Count -or $All) { Save-Cache $cache }
 }
 
 function Write-Preview($n, $d, $i) {

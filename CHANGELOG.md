@@ -17,6 +17,11 @@ What changed, newest first. The project has no version numbers yet, so entries g
 - **Ctrl+D** in the menu removes a distro (`wsl --unregister`, after typing its name), and
   its folder when nothing else is in it.
 
+### Fixed
+
+- With no distros installed, the menu listed words of WSL's "no installed distributions"
+  message ("You", "Use", "and") as distros.
+
 ## 2026-10-15: A launcher menu
 
 ### Added
