@@ -2,6 +2,16 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: The menu is back on main
+
+### Changed
+
+- The Windows menu, new and removed distros and the `hyprland-wsl` command are on main again,
+  so one download has everything. The Launcher branch now only holds optional extras (a
+  Win+Shift+H popup for BetterHotkeys users); nothing on main depends on it.
+- The `hyprland-wsl` command opens the menu without arguments and starts a distro with
+  `-Distro NAME`; `windows\hyprland-wsl.ps1` itself keeps starting the default distro.
+
 ## 2026-10-15: Three branches
 
 ### Changed

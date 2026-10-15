@@ -61,6 +61,9 @@ if ($LASTEXITCODE) { throw 'The Omarchy installer kept asking for a restart.' }
 # from the next start.
 wsl.exe -t $Name | Out-Null
 Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name"
+# "hyprland-wsl" in Windows terminals: the menu, or a session with -Distro.
+& (Join-Path $PSScriptRoot 'install-command.ps1')
+
 if (-not $NoStart) {
     Write-Host 'Starting it now ...'
     & (Join-Path $PSScriptRoot 'hyprland-wsl.ps1') -Distro $Name

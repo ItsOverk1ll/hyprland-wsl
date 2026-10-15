@@ -13,11 +13,10 @@ The aim is to support all major Linux distributions under WSL2.
 
 | Branch | What it is |
 | --- | --- |
-| **main** (this one) | hyprland-wsl itself: the installer, the `hyprland-wsl` command inside WSL, the Windows viewer script, Omarchy's installer |
-| [**Launcher**](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher) | a menu for Windows that starts, creates and removes distros, opened with `hyprland-wsl` or Win+Shift+H. One-line install |
+| **main** (this one) | hyprland-wsl: the installer, the Windows menu and `hyprland-wsl` command, new and removed distros, the viewer script, Omarchy's installer |
+| [**Launcher**](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher) | optional ways to open the menu, such as a Win+Shift+H popup for BetterHotkeys users |
 | [**Operating-Systems**](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems) | step-by-step guides for installing each distro with hyprland-wsl |
 
-The easiest start: install the [launcher](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher), then pick **+ New distro** in its menu.
 
 ## Documentation
 
@@ -130,7 +129,7 @@ full screen, with the keyboard captured:
 
 ```powershell
 .\windows\hyprland-wsl.cmd -Distro <distro>              # full screen, keyboard captured
-hyprland-wsl -Distro <distro>                           # the same, with the launcher installed (any terminal)
+hyprland-wsl -Distro <distro>                           # the same, from any terminal once the command is set up
 .\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
 .\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered
 .\windows\hyprland-wsl.cmd -Distro <distro> -Software    # draw on the CPU
@@ -155,9 +154,57 @@ hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
 
 ### A menu of your distros
 
-The [launcher](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher) adds a menu for Windows: type `hyprland-wsl` in any terminal, or
-press Win+Shift+H with [BetterHotkeys](https://github.com/ItsOverk1ll/BetterHotkeys), to start,
-create and remove distros. It lives on its own branch and installs with one line; see its README.
+Type `hyprland-wsl` in any Windows terminal (PowerShell, cmd, Windows Terminal). It opens a
+menu that lists every WSL distro, shows which ones have hyprland-wsl and what they render on,
+and starts the one you pick:
+
+```powershell
+hyprland-wsl
+```
+
+`bootstrap.ps1` and `install-omarchy.ps1` set the command up; without them, run
+`.\windows\install-command.ps1` once (it adds `%LOCALAPPDATA%\hyprland-wsl\bin` to your user
+PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu without it.
+
+| Key | Action |
+| --- | --- |
+| Enter | start full screen (on a distro without hyprland-wsl: offer to install it) |
+| Ctrl+W | start in a window |
+| Ctrl+T | stop the distro |
+| Ctrl+D | remove the distro completely (asks you to type its name first; see below) |
+| Ctrl+R | rescan every distro |
+| Esc | close |
+
+The top row, **+ New distro**, installs a new one with Hyprland. Pick Arch Linux, CachyOS, Kali
+Linux, Ubuntu 26.04 or Linux Mint 22.3, then fill in a short form: name, folder for its disk,
+user name, password, hostname, main key (SUPER or ALT), whether it becomes WSL's default distro,
+and whether to start it when done. The user gets sudo with that password. CachyOS and Mint come
+from their Docker images (see [Distros without a WSL image](#distros-without-a-wsl-image)); for
+Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks nothing: it
+installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
+Omarchy's own setup.
+
+New distros get their folder under `C:\WSL` unless the `HYPRLAND_WSL_DISTROS` environment
+variable names another place, for example a separate drive:
+`[Environment]::SetEnvironmentVariable('HYPRLAND_WSL_DISTROS', 'P:\WSL', 'User')`.
+
+Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing else is in it,
+its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
+`-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if
+any. The menu lists all of it before you confirm. Terminal's settings are backed up to
+`%LOCALAPPDATA%\hyprland-wsl\backups` first. Without the menu: `.\windows\remove-distro.ps1 -Name NAME`.
+emove-distro.ps1 -Name NAME`.
+
+The same works without the menu:
+
+```powershell
+.\windows\new-distro.ps1 -Distro arch -Name myarch -User me -Hostname myarch   # asks for the password
+```
+
+The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and
+`winget install junegunn.fzf`). It looks at each distro once, by starting it, and remembers the
+answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours follow the current
+BetterHotkeys theme when that is installed, and Omarchy's Hackerman otherwise.
 
 Default keys (the installed config uses ALT as the main modifier, because the WSLg window
 cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
@@ -176,7 +223,7 @@ cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
 CachyOS and Linux Mint are not in `wsl --list --online`. Both publish Docker images, which can be
 imported into WSL without Docker: `tools/Get-DockerRootfs.ps1` downloads an image's layers and
 `tools/merge-layers.sh` merges several into one. The [CachyOS](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/cachyos.md) and
-[Linux Mint](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/mint.md) guides walk through it; the launcher does it for you.
+[Linux Mint](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/mint.md) guides walk through it; the menu's **+ New distro** does it for you.
 
 ## How it works
 
@@ -239,4 +286,4 @@ The frame rate at TigerVNC's own viewer has not been measured; that viewer does 
 ```
 
 Removes the launcher and the patched library. Packages, the user and `~/.config/hypr` stay.
-The launcher, if you installed it, has its own uninstaller (see its README).
+The Windows command is removed with `.\windows\install-command.ps1 -Remove`.
