@@ -77,4 +77,4 @@ Project:
 - [ ] Choose a license
 - [ ] Report the headless-backend change to hyprwm/aquamarine
 - [ ] Decide on the PPA, and on the unprompted `pacman -Syu`
-- [ ] Remove or trim the working notes (`claude-context.md`, `dev-log/`) before going public
+- [x] Working notes kept out of the public repository

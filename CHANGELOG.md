@@ -177,7 +177,6 @@ What changed, newest first. The project has no version numbers yet, so entries g
 
 ### Added
 
-- `dev-log/scripts/Measure-ViewerCursor.ps1`: reads the cursor Windows shows over the viewer.
 - The viewer closes when the session ends from inside (`-ReconnectOnError=0`).
 
 ## 2026-10-13: Omarchy
@@ -235,7 +234,6 @@ the CPU was the only way before:
   driver.
 - **`tools/vnc-probe.py fps`**: updates per second and how evenly they arrive, measured the way
   a viewer receives them. **`cursor`**: the pointer image a VNC server sends.
-- **`dev-log/scripts/71-suite.sh`**: every check in one run, for any distro.
 - This changelog.
 
 ### Changed

@@ -227,7 +227,7 @@ of hyprland-wsl, and keeps every distro (remove those first with Ctrl+D if you w
 
 New distros get their folder under `C:\WSL` unless the `HYPRLAND_WSL_DISTROS` environment
 variable names another place, for example a separate drive:
-`[Environment]::SetEnvironmentVariable('HYPRLAND_WSL_DISTROS', 'P:\WSL', 'User')`.
+`[Environment]::SetEnvironmentVariable('HYPRLAND_WSL_DISTROS', 'D:\WSL', 'User')`.
 
 Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing else is in it,
 its Windows Terminal profiles (the one WSL made and any you made yourself that start it with

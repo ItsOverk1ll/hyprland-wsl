@@ -28,7 +28,7 @@ if (-not $Password) { $Password = $User }
 $repo = Split-Path $PSScriptRoot -Parent
 if ($repo -notmatch '^[A-Za-z]:\\') {
     $copy = Join-Path $env:LOCALAPPDATA 'hyprland-wsl\repo-copy'
-    robocopy $repo $copy /MIR /XD .git dev-log /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $repo $copy /MIR /XD .git /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Could not copy $repo to $copy." }
     $repo = $copy
 }
