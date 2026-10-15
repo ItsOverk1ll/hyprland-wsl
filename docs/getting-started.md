@@ -47,6 +47,8 @@ combination. Nothing about Windows is replaced.
      paste the same line again. It carries on where it stopped.
    - **"Also put a shortcut on the desktop?"**: type `y` and Enter if you want one, or just
      press Enter.
+   - If Windows asks for permission to install **PowerShell 7**, click **Yes**. That only happens
+     on PCs where the usual way of installing it does not work.
 
    > 📷 *Screenshot placeholder: the installer's first screen, listing what it changes.*
 

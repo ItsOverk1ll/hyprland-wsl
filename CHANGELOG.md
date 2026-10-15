@@ -2,6 +2,23 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: The one-line install on fresh Windows 10 and 11
+
+### Changed
+
+- `bootstrap.ps1` takes over what BetterHotkeys' installer learned on fresh Windows 10 and 11
+  installs: a missing winget is fixed by registering App Installer, then by installing it from
+  winget's GitHub releases (also when it is older than 1.6); PowerShell 7 counts only when it
+  actually runs (a Microsoft Store copy without a license does not), with Microsoft's installer
+  from GitHub as the fallback; winget gets ten minutes per package and its "already installed"
+  answers count as success; programs are called so that their error output cannot stop Windows
+  PowerShell 5.1; downloads use a faster method. Without fzf the setup carries on, since the
+  menu then shows a numbered list.
+
+### Fixed
+
+- `uninstall.ps1` could stop in Windows PowerShell 5.1 when no distro was installed.
+
 ## 2026-10-15: Getting started
 
 ### Added

@@ -17,7 +17,10 @@ $downloaded = Join-Path $dataRoot 'repo'
 $fromDownload = $repo.TrimEnd('\') -ieq $downloaded
 $hasDownload = Test-Path $downloaded
 
-$distros = @((wsl.exe -l -q 2>$null) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+# Program error output must not stop Windows PowerShell 5.1 here (no distros prints to stderr).
+$ErrorActionPreference = 'Continue'
+$distros = @((wsl.exe -l -q 2>&1) | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch ' ' })
+$ErrorActionPreference = 'Stop'
 $made = @(Get-CreatedDistros | Where-Object { $_ -in $distros })
 
 Write-Host 'Uninstall hyprland-wsl from Windows' -ForegroundColor Cyan
