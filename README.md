@@ -190,6 +190,7 @@ PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu wit
 | Ctrl+W | start in a window |
 | Ctrl+T | stop the distro |
 | Ctrl+D | remove the distro completely (asks you to type its name first; see below) |
+| Ctrl+K | show the distro's keyboard basics |
 | Ctrl+R | rescan every distro |
 | Esc | close |
 
@@ -209,6 +210,12 @@ print goes to a log file in `%LOCALAPPDATA%\hyprland-wsl\logs`. If a step fails,
 what went wrong and what to try, with the log's path for a bug report, and the half-made distro
 is removed again so a retry starts clean (`new-distro.ps1 -KeepOnFailure` keeps it,
 `-ShowOutput` shows everything on screen).
+
+Before a distro's first session, a short card in the terminal shows the keys a newcomer needs:
+Ctrl+Alt+Enter to leave full screen, how to open a terminal and close a window, how to end the
+session (or Power Off on Omarchy), and which key is the main one. It shows once per distro
+(remembered in `%LOCALAPPDATA%\hyprland-wsl\keys-seen.json`); Ctrl+K in the menu shows it again,
+and `hyprland-wsl.ps1 -NoKeyCard` skips it.
 
 The bottom row, **Uninstall hyprland-wsl**, runs `windows\uninstall.ps1`: it removes the command,
 the Start menu entries, the menu's cache and logs, the downloaded viewer and the downloaded copy

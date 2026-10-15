@@ -24,7 +24,8 @@ param(
     [int]    $Fps = 60,                # most frames per second sent to the viewer
     [switch] $Software,                # render on the CPU even if a GPU is available
     [switch] $Windowed,
-    [switch] $Native                   # full screen at the display's real resolution
+    [switch] $Native,                  # full screen at the display's real resolution
+    [switch] $NoKeyCard                # skip the keyboard card shown before a distro's first session
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,6 +93,14 @@ if (Test-Vnc) { throw "Something already answers on port $Port. Stop that sessio
 # Exit code 2 is a launcher from before this command existed: nothing to set up.
 & wsl.exe @wsl hyprland-wsl first-start
 if ($LASTEXITCODE -and $LASTEXITCODE -ne 2) { throw "The distro's first-start setup did not finish. Start again to retry." }
+
+# Before a distro's first session: a short card with the keys a newcomer needs (common.ps1).
+. (Join-Path $PSScriptRoot 'common.ps1')
+if (-not $NoKeyCard -and -not (Test-KeysSeen $Distro)) {
+    $keys = Get-KeyInfo $Distro
+    Show-KeyCard $Distro $keys.mod ([bool]$keys.omarchy)
+    Set-KeysSeen $Distro
+}
 
 Write-Host "Starting Hyprland at $Size, scale $scaleText ..."
 $launch = @('hyprland-wsl', $Size, '--scale', $scaleText, '--port', $Port, '--fps', $Fps, '--no-viewer')

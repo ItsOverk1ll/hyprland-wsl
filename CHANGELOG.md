@@ -2,6 +2,17 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: The keyboard card
+
+### Added
+
+- **Before a distro's first session, a short keyboard card** in the terminal: Ctrl+Alt+Enter to
+  leave full screen, opening a terminal, closing a window, ending the session (Power Off on
+  Omarchy), and the main key, read from the distro's own config. Shown once per distro, whether
+  the session starts from the menu, a Start menu entry or `hyprland-wsl -Distro`; **Ctrl+K** in
+  the menu shows it again. `hyprland-wsl.ps1 -NoKeyCard` skips it.
+- `tools/distro-info.sh` reports the main key (`mod=`).
+
 ## 2026-10-15: The menu for newcomers
 
 ### Added

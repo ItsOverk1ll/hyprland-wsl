@@ -3,7 +3,8 @@
 #
 #   Enter      start full screen          Ctrl+W   start in a window
 #   Ctrl+T     stop the distro            Ctrl+D   remove the distro
-#   Ctrl+R     rescan every distro        Esc      close
+#   Ctrl+R     rescan every distro        Ctrl+K   its keyboard basics
+#   Esc        close
 #
 # The top row, "+ New distro", creates one (new-distro.ps1, or install-omarchy.ps1 for Omarchy);
 # the bottom row uninstalls hyprland-wsl from Windows (uninstall.ps1). The menu is only a front
@@ -162,17 +163,29 @@ function Write-DistroPreview($tag, $d, $i) {
     Write-PreviewFile $tag $lines
 }
 
+# The distro's main key for the keyboard card; asked from the distro when the cache predates it.
+function Get-MainKey($d, $info) {
+    if ($info.mod -or $info.omarchy) { return $info.mod }
+    (Get-KeyInfo $d.Name).mod
+}
+
 function Start-Distro($d, $info, [switch]$Windowed) {
     $launch = Join-Path $PSScriptRoot 'hyprland-wsl.ps1'
     $argv = @('-NoLogo', '-NoProfile', '-File', $launch, '-Distro', $d.Name)
     if ($Windowed) { $argv += '-Windowed' }
     if ($info.setup) {
-        # The first start runs a setup that needs this terminal.
+        # The first start runs a setup that needs this terminal; the keyboard card follows it there.
         Clear-Host
         & pwsh @argv
         return
     }
-    Start-Process pwsh -ArgumentList $argv -WindowStyle Hidden
+    # The session runs in a hidden window, so the keyboard card (first session only) shows here.
+    if (-not (Test-KeysSeen $d.Name)) {
+        Clear-Host
+        Show-KeyCard $d.Name (Get-MainKey $d $info) ([bool]$info.omarchy)
+        Set-KeysSeen $d.Name
+    }
+    Start-Process pwsh -ArgumentList ($argv + '-NoKeyCard') -WindowStyle Hidden
     Write-Host "  ${accent}Starting $($d.Name) ...$reset"
     Start-Sleep -Milliseconds 700
     exit 0
@@ -343,9 +356,9 @@ while ($true) {
     }
     $rows += "${dim}× Uninstall hyprland-wsl$reset`tuninstall"
 
-    $out = Select-Row $rows 'Hyprland on WSL' "Enter start · Ctrl+W windowed · Ctrl+T stop`nCtrl+D remove · Ctrl+R rescan · Esc close" `
-        -keys 'ctrl-w', 'ctrl-t', 'ctrl-d', 'ctrl-r' -letters @{ w = 'ctrl-w'; t = 'ctrl-t'; d = 'ctrl-d'; r = 'ctrl-r' } `
-        -help 'A number and Enter starts that distro; add w for a window, t to stop it, d to remove it (e.g. 2d). r rescans; Enter alone closes.'
+    $out = Select-Row $rows 'Hyprland on WSL' "Enter start · Ctrl+W windowed · Ctrl+T stop · Ctrl+K keys`nCtrl+D remove · Ctrl+R rescan · Esc close" `
+        -keys 'ctrl-w', 'ctrl-t', 'ctrl-d', 'ctrl-r', 'ctrl-k' -letters @{ w = 'ctrl-w'; t = 'ctrl-t'; d = 'ctrl-d'; r = 'ctrl-r'; k = 'ctrl-k' } `
+        -help 'A number and Enter starts that distro; add w for a window, t to stop it, d to remove it, k for its keys (e.g. 2d). r rescans; Enter alone closes.'
     if (-not $out) { exit 0 }
     $key, $row = @($out)
     if ($key -eq 'ctrl-r') { Clear-Host; Update-Cache $cache $distros -All; continue }
@@ -371,6 +384,7 @@ while ($true) {
     $d = $distros[[int]$tag.Substring(1) - 1]
     $info = $cache[$d.Name]
     if ($key -eq 'ctrl-t') { wsl.exe -t $d.Name | Out-Null; continue }
+    if ($key -eq 'ctrl-k') { Clear-Host; Show-KeyCard $d.Name (Get-MainKey $d $info) ([bool]$info.omarchy) -Again; continue }
     if ($key -eq 'ctrl-d') { if (Remove-Distro $d) { $cache.Remove($d.Name); Save-Cache $cache }; continue }
     if (-not $info.installed) {
         if ($info.family) { Install-HyprlandWsl $d $info; $cache[$d.Name] = Get-DistroInfo $d.Name; Save-Cache $cache }
