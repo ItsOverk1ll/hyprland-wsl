@@ -2,15 +2,16 @@
 # current Omarchy theme). Enter starts the selected distro's Hyprland full screen.
 #
 #   Enter      start full screen          Ctrl+W   start in a window
-#   Ctrl+T     stop the distro            Ctrl+D   remove (unregister) the distro
+#   Ctrl+T     stop the distro            Ctrl+D   remove the distro
 #   Ctrl+R     rescan every distro        Esc      close
 #
-# The top row, "+ New distro", creates one: Arch, CachyOS, Kali, Ubuntu or Mint with the account,
-# hostname and so on asked for here (new-distro.ps1), or Omarchy, which asks in its own setup.
+# The top row, "+ New distro", creates one (new-distro.ps1, or install-omarchy.ps1 for Omarchy);
+# the bottom row uninstalls hyprland-wsl from Windows (uninstall.ps1). The menu is only a front
+# end: each of those scripts works on its own.
 #
 # What it knows about each distro (installed, user, versions) is read once by starting the
 # distro and kept in %LOCALAPPDATA%\hyprland-wsl\distros.json; Ctrl+R refreshes it.
-# Needs fzf (winget install junegunn.fzf).
+# Draws with fzf (winget install junegunn.fzf); without it, a numbered list. Needs PowerShell 7.
 
 $ErrorActionPreference = 'Stop'
 # UTF-8 without BOM, otherwise the first line piped to fzf starts with U+FEFF
@@ -20,10 +21,9 @@ $env:WSL_UTF8 = 1
 . (Join-Path $PSScriptRoot 'remove-distro.ps1')
 # Sent to each distro on stdin, so it works wherever the checkout is.
 $infoScript = (Get-Content (Join-Path $repo 'tools\distro-info.sh') -Raw) -replace "`r", ''
-$dataDir = Join-Path $env:LOCALAPPDATA 'hyprland-wsl'
-$cacheFile = Join-Path $dataDir 'distros.json'
+$cacheFile = Join-Path $dataRoot 'distros.json'
 $previewDir = Join-Path $env:TEMP 'hyprland-wsl-launcher'
-New-Item -ItemType Directory -Force $dataDir, $previewDir | Out-Null
+New-Item -ItemType Directory -Force $dataRoot, $previewDir | Out-Null
 
 # Colours: BetterHotkeys' theme when it is installed, so the menus match; Hackerman otherwise.
 $themeLib = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'AutoHotkey\theme-lib.ps1'
@@ -51,13 +51,41 @@ $fzf = if ($fzf) { $fzf.Source } else {
     Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\junegunn.fzf*\fzf.exe" -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty FullName
 }
-if (-not $fzf) {
-    Write-Host "This menu needs fzf:  winget install junegunn.fzf"
-    Read-Host 'Press Enter to close' | Out-Null
-    exit 1
-}
+if ($env:HYPRLAND_WSL_NO_FZF) { $fzf = $null }   # for testing the numbered list
 $fzfStyle = @('--ansi', '--layout=reverse', '--gutter= ', '--border=rounded', '--prompt=  ', '--pointer=>', '--info=inline-right',
     '--header-first', "--color=$(Get-FzfColors $theme)")
+
+# A list to pick from: rows are "text<TAB>tag", the tag naming a preview file in $previewDir.
+# Returns @(key, row): key is '' for Enter or one of $keys (fzf's names, like ctrl-w); $null
+# when closed. Without fzf it shows a numbered list, and $letters (letter -> key) stand in for
+# the keys.
+function Select-Row($rows, $label, $header, [string[]] $keys, [hashtable] $letters, $help, $previewWidth = '40%') {
+    if ($fzf) {
+        $extra = @(); if ($keys) { $extra += "--expect=$($keys -join ',')" }
+        Push-Location $previewDir
+        try {
+            $out = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 @extra `
+                --preview='type {2}.txt' --preview-window="right,$previewWidth,border-left,wrap" `
+                --border-label=" $label " --header=$header
+        } finally { Pop-Location }
+        if (-not $out) { return $null }
+        if ($keys) { return @($out) }
+        return @('', $out)
+    }
+    while ($true) {
+        Clear-Host
+        Write-Host "`n  $accent$label$reset  ${dim}(install fzf for the full menu: winget install junegunn.fzf)$reset`n"
+        for ($i = 0; $i -lt $rows.Count; $i++) { Write-Host ("  {0,3}  {1}" -f ($i + 1), ($rows[$i] -split "`t")[0]) }
+        Write-Host "`n  ${dim}$help$reset"
+        $answer = (Read-Host '  Number').Trim()
+        if (-not $answer) { return $null }
+        if ($letters -and $letters.ContainsKey($answer.ToLower())) { return @($letters[$answer.ToLower()], $null) }
+        if ($answer -match '^(\d+)\s*([a-z]?)$' -and [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le $rows.Count) {
+            $key = if ($Matches[2] -and $letters) { $letters[$Matches[2]] } else { '' }
+            return @($key, $rows[[int]$Matches[1] - 1])
+        }
+    }
+}
 
 function Get-Distros {
     # wsl -l -v: "* Name  State  Version", the default marked with *
@@ -108,35 +136,30 @@ function Update-Cache($cache, $distros, [switch]$All) {
     if ($todo.Count -or $gone.Count -or $All) { Save-Cache $cache }
 }
 
-function Write-Preview($n, $d, $i) {
+function Write-PreviewFile($tag, $lines) {
+    Set-Content (Join-Path $previewDir "$tag.txt") ($lines -join "`n") -Encoding utf8NoBOM
+}
+
+function Write-DistroPreview($tag, $d, $i) {
     $lines = @()
-    if (-not $d) {
-        $lines += "${accent}New distro$reset", '',
-            'Install a new WSL distro with',
-            'Hyprland: Arch Linux, CachyOS, Kali,',
-            'Ubuntu, Linux Mint or Omarchy.', '',
-            "${dim}You choose the name, account,$reset",
-            "${dim}password and hostname next.$reset"
+    $state = if ($d.State -eq 'Running') { "${accent}running$reset" } else { "${dim}stopped$reset" }
+    $lines += "$bright$($d.Name)$reset  $state$(if ($d.Default) { "  ${dim}(default)$reset" })", ''
+    $lines += "${dim}System      $reset$($i.os)"
+    if ($i.omarchy -and $i.os -ne 'Omarchy') { $lines += "${dim}Desktop     ${reset}Omarchy" }
+    if ($i.hyprland) { $lines += "${dim}Hyprland    $reset$($i.hyprland)" }
+    if ($i.installed) {
+        $user = if ($i.setup) { "${warn}set up at first start$reset" } elseif ($i.user) { $i.user } else { '?' }
+        $lines += "${dim}User        $reset$user"
+        $render = if ($i.gpu -and $i.mesa -and [int]($i.mesa -split '\.')[0] -ge 26) { "GPU ${dim}(Mesa $($i.mesa))$reset" }
+                  elseif ($i.mesa) { "CPU ${dim}(Mesa $($i.mesa) < 26)$reset" } else { 'CPU' }
+        $lines += "${dim}Renders on  $reset$render"
     } else {
-        $state = if ($d.State -eq 'Running') { "${accent}running$reset" } else { "${dim}stopped$reset" }
-        $lines += "$bright$($d.Name)$reset  $state$(if ($d.Default) { "  ${dim}(default)$reset" })", ''
-        $lines += "${dim}System      $reset$($i.os)"
-        if ($i.omarchy -and $i.os -ne 'Omarchy') { $lines += "${dim}Desktop     ${reset}Omarchy" }
-        if ($i.hyprland) { $lines += "${dim}Hyprland    $reset$($i.hyprland)" }
-        if ($i.installed) {
-            $user = if ($i.setup) { "${warn}set up at first start$reset" } elseif ($i.user) { $i.user } else { '?' }
-            $lines += "${dim}User        $reset$user"
-            $render = if ($i.gpu -and $i.mesa -and [int]($i.mesa -split '\.')[0] -ge 26) { "GPU ${dim}(Mesa $($i.mesa))$reset" }
-                      elseif ($i.mesa) { "CPU ${dim}(Mesa $($i.mesa) < 26)$reset" } else { 'CPU' }
-            $lines += "${dim}Renders on  $reset$render"
-        } else {
-            $lines += '', "${warn}hyprland-wsl is not installed.$reset"
-            if ($i.family) { $lines += "${dim}Enter installs it.$reset" }
-            else { $lines += "${dim}This distro is not supported yet.$reset" }
-        }
-        $lines += '', "${dim}As of $($i.scanned); Ctrl+R rescans.$reset"
+        $lines += '', "${warn}hyprland-wsl is not installed.$reset"
+        if ($i.family) { $lines += "${dim}Enter installs it.$reset" }
+        else { $lines += "${dim}This distro is not supported yet.$reset" }
     }
-    Set-Content (Join-Path $previewDir "$n.txt") ($lines -join "`n") -Encoding utf8NoBOM
+    $lines += '', "${dim}As of $($i.scanned); Ctrl+R rescans.$reset"
+    Write-PreviewFile $tag $lines
 }
 
 function Start-Distro($d, $info, [switch]$Windowed) {
@@ -187,13 +210,21 @@ function Read-YesNo($label, [bool]$default) {
     $v -match '^y'
 }
 
+# The choices under "+ New distro", the recommended one first: title, a short honest label,
+# and the preview text.
 $newDistros = [ordered]@{
-    arch    = @('Arch Linux',      'From WSL''s own catalogue. Rolling', 'release, the newest Hyprland.')
-    cachyos = @('CachyOS',         'Arch-based, with optimised packages.', 'Downloaded from its Docker image.')
-    kali    = @('Kali Linux',      'From WSL''s own catalogue. Debian-', 'based, rolling.')
-    ubuntu  = @('Ubuntu 26.04',    'From WSL''s own catalogue. An older', 'Hyprland (0.53) than the others.')
-    mint    = @('Linux Mint 22.3', 'From its Docker image. Hyprland', 'comes from a third-party PPA.')
-    omarchy = @('Omarchy',         'Arch with Omarchy, the desktop by', 'DHH. Asks for its account and', 'the rest in its own setup screens.')
+    arch    = @('Arch Linux', 'Recommended',
+                'The best supported. Comes from WSL''s', 'own catalogue, with the newest Hyprland,', 'smooth on the GPU.', '', 'About 3 to 5 minutes.')
+    omarchy = @('Omarchy', 'Arch with DHH''s desktop, ~11 GB',
+                'Arch with Omarchy, a complete desktop', 'by DHH: bar, menus, themes, apps.', 'Asks for your account and the rest in', 'its own setup screens on first start.', '', 'About 10 minutes and 11 GB.')
+    cachyos = @('CachyOS', 'via Docker image',
+                'Arch-based, with optimised packages.', 'Downloaded from its Docker image,', 'since WSL has none.', '', 'About 3 to 6 minutes.')
+    kali    = @('Kali Linux', 'heavier, security tools',
+                'Debian-based, rolling, with Kali''s', 'security tools. Slower in general', 'than the others.', '', 'About 3 to 5 minutes.')
+    mint    = @('Linux Mint 22.3', 'via Docker image, third-party PPA',
+                'Mint has no WSL image and no Hyprland:', 'it comes from its Docker image, and', 'Hyprland from a PPA that is not part', 'of Mint. You are asked about it.', '', 'About 4 to 8 minutes.')
+    ubuntu  = @('Ubuntu 26.04', 'older Hyprland, less smooth',
+                'Works, with an older Hyprland (0.53)', 'and less smooth than the others.', '', 'About 3 to 5 minutes.')
 }
 
 # Sets $script:made to the new distro's name when it should be started. Called as a statement,
@@ -202,24 +233,20 @@ function New-Distro($distros) {
     $script:made = $null
     $rows = foreach ($k in $newDistros.Keys) {
         $t = $newDistros[$k]
-        $lines = @("$accent$($t[0])$reset", '') + $t[1..($t.Count - 1)]
-        Set-Content (Join-Path $previewDir "new-$k.txt") ($lines -join "`n") -Encoding utf8NoBOM
-        "$bright$($t[0])$reset`tnew-$k"
+        Write-PreviewFile "new-$k" (@("$accent$($t[0])$reset", '') + $t[2..($t.Count - 1)])
+        $note = if ($t[1] -eq 'Recommended') { "$accent$($t[1])$reset" } else { "$dim$($t[1])$reset" }
+        ("$bright{0,-17}$reset {1}`tnew-$k" -f $t[0], $note)
     }
-    Push-Location $previewDir
-    try {
-        $pick = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 `
-            --preview='type {2}.txt' --preview-window='right,50%,border-left,wrap' `
-            --border-label=' New distro ' --header='Enter choose · Esc back'
-    } finally { Pop-Location }
-    if (-not $pick) { return }
-    $kind = ($pick -split "`t")[-1] -replace '^new-', ''
+    $pick = Select-Row $rows 'New distro' 'Enter choose · Esc back' -help 'Type a number and Enter; Enter alone goes back.' -previewWidth '45%'
+    if (-not $pick -or -not $pick[1]) { return }
+    $kind = ($pick[1] -split "`t")[-1] -replace '^new-', ''
     $title = $newDistros[$kind][0]
     Clear-Host
 
     if ($kind -eq 'omarchy') {
         $name = Get-FreeName 'omarchy' $distros
-        Write-Host "`n  ${accent}New Omarchy instance '$name'$reset ${dim}in $distroRoot\$name$reset`n"
+        Write-Host "`n  ${accent}New Omarchy instance '$name'$reset ${dim}in $distroRoot\$name. About 10 minutes and 11 GB.$reset"
+        Write-Host "  ${dim}Its own setup screens (keyboard, account, computer name, time zone) follow in this window.$reset`n"
         & pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'install-omarchy.ps1') -Name $name -Location "$distroRoot\$name"
         return
     }
@@ -258,8 +285,11 @@ function New-Distro($distros) {
 
     $params = @{ Distro = $kind; Name = $name; Location = $folder; User = $user; Password = $pw
                  Hostname = $hostname; Mod = $mod; SetDefault = $default; AllowPpa = $ppa }
+    $global:LASTEXITCODE = 0
     try {
         & (Join-Path $PSScriptRoot 'new-distro.ps1') @params
+        # new-distro.ps1 has already said what went wrong when it exits with an error.
+        if ($LASTEXITCODE) { Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null; return }
     } catch {
         Write-Host "`n  ${warn}$($_.Exception.Message)$reset"
         Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null
@@ -274,6 +304,7 @@ function Remove-Distro($d) {
     $l = Get-DistroLeftovers $d.Name
     Write-Host "`n  ${warn}Remove $($d.Name)?$reset  ${dim}This deletes for good:$reset"
     foreach ($w in Format-Leftovers $l) { Write-Host "  ${dim}- $w$reset" }
+    if (-not $l.MadeHere) { Write-Host "`n  $warn$notMadeHereWarning$reset" }
     Write-Host "`n  ${dim}Type the name to confirm, or Enter to keep it.$reset`n"
     Write-Host "  ${accent}Name$reset${accent} >$reset " -NoNewline
     if ([Console]::ReadLine().Trim() -cne $d.Name) { return $false }
@@ -286,38 +317,42 @@ $cache = Read-Cache
 $distros = @(Get-Distros)
 Update-Cache $cache $distros
 
+Write-PreviewFile 'new' @("${accent}New distro$reset", '',
+    'Install a Linux system in WSL with', 'Hyprland: Arch Linux (recommended),', 'Omarchy, CachyOS, Kali, Linux Mint', 'or Ubuntu.', '',
+    "${dim}You choose the name, account,$reset", "${dim}password and computer name next.$reset")
+Write-PreviewFile 'uninstall' @("${accent}Uninstall hyprland-wsl$reset", '',
+    'Removes the hyprland-wsl command, its', 'Start menu entries, the cache and the', 'downloaded viewer from Windows.', '',
+    "${dim}Your distros are kept. Remove them$reset", "${dim}first (Ctrl+D) if you want them gone.$reset")
+
 while ($true) {
     $distros = @(Get-Distros)
     Clear-Host
-    $rows = @("$accent+ New distro$reset`t0")
-    Write-Preview 0 $null $null
+    $rows = @("$accent+ New distro$reset`tnew")
     $i = 1
     foreach ($d in $distros) {
         $info = if ($cache.Contains($d.Name)) { $cache[$d.Name] } else { @{} }
         $dot = if ($d.State -eq 'Running') { "$accent●$reset" } else { "$dim○$reset" }
         $what = if ($info.omarchy) { 'Omarchy' } elseif ($info.os) { ($info.os -replace ' GNU/Linux| LTS|\(.*\)', '').Trim() } else { '' }
         # padded before colouring: the escape codes would count towards the width
-        $name = if ($info.installed) { "$bright{0,-16}$reset" -f $d.Name } else { "$dim{0,-16}$reset" -f $d.Name }
+        $label = if ($info.installed) { "$bright{0,-16}$reset" -f $d.Name } else { "$dim{0,-16}$reset" -f $d.Name }
         $what = "$dim{0,-17}$reset" -f $what
         $note = if ($info.setup) { "${warn}first-start setup$reset" } elseif ($info.installed) { "$dim$($info.hyprland)$reset" } else { "${dim}not set up$reset" }
-        $rows += ("{0} {1} {2} {3}`t{4}" -f $dot, $name, $what, $note, $i)
-        Write-Preview $i $d $info
+        $rows += ("{0} {1} {2} {3}`td{4}" -f $dot, $label, $what, $note, $i)
+        Write-DistroPreview "d$i" $d $info
         $i++
     }
+    $rows += "${dim}× Uninstall hyprland-wsl$reset`tuninstall"
 
-    Push-Location $previewDir
-    try {
-        $out = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 --expect='ctrl-w,ctrl-t,ctrl-d,ctrl-r' `
-            --preview='type {2}.txt' --preview-window='right,40%,border-left,wrap' `
-            --border-label=' Hyprland on WSL ' `
-            --header="Enter start · Ctrl+W windowed · Ctrl+T stop`nCtrl+D remove · Ctrl+R rescan · Esc close"
-    } finally { Pop-Location }
+    $out = Select-Row $rows 'Hyprland on WSL' "Enter start · Ctrl+W windowed · Ctrl+T stop`nCtrl+D remove · Ctrl+R rescan · Esc close" `
+        -keys 'ctrl-w', 'ctrl-t', 'ctrl-d', 'ctrl-r' -letters @{ w = 'ctrl-w'; t = 'ctrl-t'; d = 'ctrl-d'; r = 'ctrl-r' } `
+        -help 'A number and Enter starts that distro; add w for a window, t to stop it, d to remove it (e.g. 2d). r rescans; Enter alone closes.'
     if (-not $out) { exit 0 }
     $key, $row = @($out)
     if ($key -eq 'ctrl-r') { Clear-Host; Update-Cache $cache $distros -All; continue }
     if (-not $row) { continue }
-    $index = [int]($row -split "`t")[-1]
-    if ($index -eq 0) {
+    $tag = ($row -split "`t")[-1]
+
+    if ($tag -eq 'new') {
         if ($key) { continue }
         New-Distro $distros
         $distros = @(Get-Distros)
@@ -325,8 +360,15 @@ while ($true) {
         if ($made) { Start-Distro ($distros | Where-Object Name -eq $made) $cache[$made] }
         continue
     }
+    if ($tag -eq 'uninstall') {
+        if ($key) { continue }
+        Clear-Host
+        & (Join-Path $PSScriptRoot 'uninstall.ps1')
+        if (-not (Test-Path (Join-Path $dataRoot 'bin\hyprland-wsl.cmd'))) { Write-Host "`n  ${dim}Press Enter to close$reset"; [Console]::ReadLine() | Out-Null; exit 0 }
+        continue
+    }
 
-    $d = $distros[$index - 1]
+    $d = $distros[[int]$tag.Substring(1) - 1]
     $info = $cache[$d.Name]
     if ($key -eq 'ctrl-t') { wsl.exe -t $d.Name | Out-Null; continue }
     if ($key -eq 'ctrl-d') { if (Remove-Distro $d) { $cache.Remove($d.Name); Save-Cache $cache }; continue }

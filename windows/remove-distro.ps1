@@ -6,7 +6,7 @@
 #     (a command line with "-d NAME", "--distribution NAME" or hyprland-wsl's "-Distro NAME")
 #   - the Microsoft Store app it was installed from, if any (Kali's, Ubuntu's, ...)
 #
-#   .\remove-distro.ps1 -Name archfresh            asks first
+#   .\remove-distro.ps1 -Name archfresh            asks you to type the name first
 #   .\remove-distro.ps1 -Name archfresh -Force
 #   .\remove-distro.ps1 -Name old1, old2 -ProfilesOnly    Terminal profiles of distros already gone
 #
@@ -64,6 +64,7 @@ function Get-DistroLeftovers([string] $distro) {
         Base     = if ($reg.BasePath) { $reg.BasePath -replace '^\\\\\?\\', '' }
         Profiles = @($profiles)
         Shortcuts = @(Find-Shortcuts (Get-DistroShortcutNote $distro))
+        MadeHere = $distro -in (Get-CreatedDistros)
         Package  = $package
     }
 }
@@ -101,6 +102,7 @@ function Remove-DistroCompletely($leftovers) {
     }
     if ($leftovers.Profiles) { Remove-TerminalProfiles $leftovers.Profiles }
     $leftovers.Shortcuts | Remove-Item -ErrorAction SilentlyContinue
+    Remove-CreatedDistro $leftovers.Name
     if ($leftovers.Package) { $leftovers.Package | Remove-AppxPackage }
 }
 
@@ -113,6 +115,9 @@ function Format-Leftovers($leftovers) {
     $lines
 }
 
+# For distros hyprland-wsl did not create: they may hold someone's own files and setup.
+$notMadeHereWarning = 'This distro was not made by hyprland-wsl. It may hold your own files, programs and settings, which are deleted with it.'
+
 if ($MyInvocation.InvocationName -eq '.') { return }   # dot-sourced: functions only
 
 $ErrorActionPreference = 'Stop'
@@ -122,7 +127,8 @@ foreach ($n in $DistroName) {
     $what = @(Format-Leftovers $l)
     if (-not $what) { Write-Host "${n}: nothing to remove."; continue }
     Write-Host "${n}:"; $what | ForEach-Object { Write-Host "  - $_" }
-    if (-not $Force -and (Read-Host 'Remove all of this? (y/N)') -notmatch '^y') { continue }
+    if ($l.Exists -and -not $l.MadeHere) { Write-Host $notMadeHereWarning -ForegroundColor Yellow }
+    if (-not $Force -and (Read-Host "Type the name ($n) to remove all of this, or Enter to keep it") -cne $n) { continue }
     Remove-DistroCompletely $l
     Write-Host "Removed."
 }

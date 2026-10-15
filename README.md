@@ -193,14 +193,26 @@ PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu wit
 | Ctrl+R | rescan every distro |
 | Esc | close |
 
-The top row, **+ New distro**, installs a new one with Hyprland. Pick Arch Linux, CachyOS, Kali
-Linux, Ubuntu 26.04 or Linux Mint 22.3, then fill in a short form: name, folder for its disk,
+The top row, **+ New distro**, installs a new one with Hyprland. **Arch Linux** is marked as
+recommended; the others carry a short note (Omarchy: Arch with DHH's desktop, about 11 GB;
+CachyOS: via its Docker image; Kali: heavier; Linux Mint: via its Docker image and a third-party
+PPA; Ubuntu 26.04: older Hyprland, less smooth). Then fill in a short form: name, folder for its disk,
 user name, password, hostname, main key (SUPER or ALT), whether it becomes WSL's default distro,
 and whether to start it when done. The user gets sudo with that password. CachyOS and Mint come
 from their Docker images (see [Distros without a WSL image](#distros-without-a-wsl-image)); for
 Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks nothing: it
 installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
 Omarchy's own setup.
+
+While a distro installs, the menu shows one line per step with a rough time. Everything the tools
+print goes to a log file in `%LOCALAPPDATA%\hyprland-wsl\logs`. If a step fails, one sentence says
+what went wrong and what to try, with the log's path for a bug report, and the half-made distro
+is removed again so a retry starts clean (`new-distro.ps1 -KeepOnFailure` keeps it,
+`-ShowOutput` shows everything on screen).
+
+The bottom row, **Uninstall hyprland-wsl**, runs `windows\uninstall.ps1`: it removes the command,
+the Start menu entries, the menu's cache and logs, the downloaded viewer and the downloaded copy
+of hyprland-wsl, and keeps every distro (remove those first with Ctrl+D if you want them gone).
 
 New distros get their folder under `C:\WSL` unless the `HYPRLAND_WSL_DISTROS` environment
 variable names another place, for example a separate drive:
@@ -210,8 +222,8 @@ Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing
 its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
 `-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if
 any. The menu lists all of it before you confirm. Terminal's settings are backed up to
-`%LOCALAPPDATA%\hyprland-wsl\backups` first. Without the menu: `.\windows\remove-distro.ps1 -Name NAME`.
-emove-distro.ps1 -Name NAME`.
+`%LOCALAPPDATA%\hyprland-wsl\backups` first. Distros that hyprland-wsl did not create get an extra
+warning, since they may hold your own files. Without the menu: `.\windows\remove-distro.ps1 -Name NAME`.
 
 The same works without the menu:
 
@@ -219,8 +231,9 @@ The same works without the menu:
 .\windows\new-distro.ps1 -Distro arch -Name myarch -User me -Hostname myarch   # asks for the password
 ```
 
-The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and
-`winget install junegunn.fzf`). It looks at each distro once, by starting it, and remembers the
+The menu needs PowerShell 7, and draws itself with fzf (`winget install junegunn.fzf`); without
+fzf it shows a numbered list instead (type `2` to start the second entry, `2w` for a window, `2d`
+to remove it). It looks at each distro once, by starting it, and remembers the
 answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours follow the current
 BetterHotkeys theme when that is installed, and Omarchy's Hackerman otherwise.
 

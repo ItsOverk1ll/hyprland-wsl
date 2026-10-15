@@ -2,6 +2,25 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: The menu for newcomers
+
+### Added
+
+- **New distro** lists Arch Linux first, marked "Recommended", and gives the others short
+  honest notes: "via Docker image", "third-party PPA", "older Hyprland, less smooth", "heavier".
+- **Without fzf the menu shows a numbered list** instead of stopping (`2` starts the second
+  entry, `2w` in a window, `2t` stops it, `2d` removes it, `r` rescans).
+- **Installs show one line per step with a rough time**, and keep everything the tools print in
+  a log file (`%LOCALAPPDATA%\hyprland-wsl\logs`). A failed step says in one sentence what went
+  wrong and what to try (for example that the chosen folder's drive does not exist, or the drive
+  is full), with the log's path, and removes the half-made distro so a retry starts clean.
+  `new-distro.ps1 -KeepOnFailure` and `-ShowOutput` are there for looking closer.
+- **Removing a distro hyprland-wsl did not create** shows an extra warning that it may hold your
+  own files; `remove-distro.ps1` on its own also asks for the name to be typed now.
+- **Uninstall hyprland-wsl** in the menu, and `windows\uninstall.ps1`: removes the command, the
+  shortcuts, the cache and logs, the downloaded viewer and the downloaded copy of hyprland-wsl.
+  Distros are never removed by it.
+
 ## 2026-10-15: Start menu entries
 
 ### Added

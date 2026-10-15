@@ -67,6 +67,7 @@ Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name
 # Its own Start menu entry: "Omarchy", or "Omarchy (NAME)" for a second one.
 . (Join-Path $PSScriptRoot 'common.ps1')
 Set-DistroShortcut $Name $(if ($Name -eq 'omarchy') { 'Omarchy' } else { "Omarchy ($Name)" }) | Out-Null
+Add-CreatedDistro $Name
 
 if (-not $NoStart) {
     Write-Host 'Starting it now ...'
