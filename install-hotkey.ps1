@@ -2,21 +2,26 @@
 #
 # The popup comes from BetterHotkeys (https://github.com/ItsOverk1ll/BetterHotkeys), which
 # this script adds the hotkey to. Without BetterHotkeys it says how to get it; the menu is
-# still one command away: "hyprland-wsl" in any terminal. install.ps1 runs this for you.
+# still one command away: "hyprland-wsl" in any terminal.
 #
-#   .\install-hotkey.ps1             add Win+Shift+H (or point it at this copy again)
-#   .\install-hotkey.ps1 -Remove     take it out again
+#   .\install-hotkey.ps1                            add Win+Shift+H
+#   .\install-hotkey.ps1 -Menu P:\hyprland-wsl\windows\launcher.ps1   for a clone of your own
+#   .\install-hotkey.ps1 -Remove                    take it out again
 #
 # What it changes, in BetterHotkeys' folder (Documents\AutoHotkey): one hotkey line in
 # hotkeys.ahk (backed up first), and a two-line hyprland-wsl.ps1 that the popup runs.
 
-param([switch] $Remove)
+param(
+    [switch] $Remove,
+    # hyprland-wsl's menu; default: the copy bootstrap.ps1 installs
+    [string] $Menu = (Join-Path $env:LOCALAPPDATA 'hyprland-wsl\repo\windows\launcher.ps1')
+)
 
 $ErrorActionPreference = 'Stop'
 $ahkDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'AutoHotkey'
 $hotkeys = Join-Path $ahkDir 'hotkeys.ahk'
 $popupScript = Join-Path $ahkDir 'hyprland-wsl.ps1'
-$launcher = Join-Path $PSScriptRoot 'launcher.ps1'
+$launcher = $Menu
 $comment = ';; Win + Shift + H | Hyprland on WSL: start a distro (toggle)'
 $binding = '#+h:: PopupTerminal("Hyprland on WSL", "hyprland-wsl.ps1", 960, 560)'
 
@@ -47,6 +52,11 @@ if ($Remove) {
     return
 }
 
+if (-not (Test-Path $launcher)) {
+    Write-Host "hyprland-wsl's menu is not at $launcher. Install hyprland-wsl first (see its README), or pass -Menu."
+    return
+}
+
 if (-not $hasBetterHotkeys) {
     Write-Host @"
 The Win+Shift+H popup comes from BetterHotkeys, which is not installed. It is recommended:
@@ -54,7 +64,7 @@ it also gives you Win+K (a cheatsheet of your hotkeys), web apps and themes. Ins
 
     irm https://raw.githubusercontent.com/ItsOverk1ll/BetterHotkeys/main/web-install.ps1 | iex
 
-and run the launcher's install.ps1 again. Without it, open the menu by typing this in any terminal:
+and run this script again. Without it, open the menu by typing this in any terminal:
 
     hyprland-wsl
 "@
