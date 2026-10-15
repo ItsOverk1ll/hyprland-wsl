@@ -103,7 +103,8 @@ alone.
   menu, the key-binding list, the file manager, Chromium, the screensaver (by script, with the
   timeout shortened), Power Off through the Windows launcher. Not gone through: every menu
   entry, audio, the lock screen, `omarchy update`, theme switching.
-- Used by hand by the owner on 2026-10-15.
+- Used by hand by the owner on 2026-10-15: Power Off and the pointer confirmed, started from a
+  Windows Terminal command-palette action.
 - On first start a "Setup Wi-Fi" notice appears. There is no Wi-Fi to set up; WSL shares
   Windows' connection.
 - Bluetooth, Wi-Fi and power settings in the shell have nothing to talk to.
