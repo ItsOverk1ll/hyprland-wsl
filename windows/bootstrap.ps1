@@ -45,6 +45,7 @@ What it may change, and where:
   - PowerShell 7 and fzf, from winget: installed if missing (Program Files and your user folder)
   - hyprland-wsl itself: downloaded to $repo
   - the "hyprland-wsl" command: $root\bin, added to your user PATH
+  - a "Hyprland on WSL" entry in your Start menu (and, if you want, on the desktop)
 No Linux system is installed yet: you choose one in the menu that opens at the end.
 "@
 
@@ -159,16 +160,19 @@ if ($env:HYPRLAND_WSL_SOURCE) {
 }
 
 # ---------------------------------------------------------------------------------------------
-Step 'The hyprland-wsl command'
-& (Join-Path $repo 'windows\install-command.ps1') | ForEach-Object { Say $_ }
+Step 'The hyprland-wsl command and the Start menu entry'
+$desktop = (Read-Host 'Also put a "Hyprland on WSL" shortcut on the desktop? (y/N)') -match '^y'
+& (Join-Path $repo 'windows\install-command.ps1') -Desktop:$desktop | ForEach-Object { Say $_ }
 $changed.Add("Added the hyprland-wsl command ($root\bin, on your user PATH)")
+$changed.Add("Added ""Hyprland on WSL"" to the Start menu$(if ($desktop) { ' and the desktop' })")
 
 # ---------------------------------------------------------------------------------------------
 Step 'Done'
 Say 'Changed on this PC:'
 foreach ($c in $changed) { Say "  - $c" }
 Say ''
-Say 'From now on, open the menu by typing hyprland-wsl in any new terminal. Opening it now ...'
+Say 'From now on, open the menu with "Hyprland on WSL" in the Start menu, or by typing hyprland-wsl'
+Say 'in any new terminal. Opening it now ...'
 Start-Sleep -Seconds 2
 & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'windows\launcher.ps1')
 }

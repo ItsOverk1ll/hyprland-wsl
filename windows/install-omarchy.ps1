@@ -64,6 +64,10 @@ Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name
 # "hyprland-wsl" in Windows terminals: the menu, or a session with -Distro.
 & (Join-Path $PSScriptRoot 'install-command.ps1')
 
+# Its own Start menu entry: "Omarchy", or "Omarchy (NAME)" for a second one.
+. (Join-Path $PSScriptRoot 'common.ps1')
+Set-DistroShortcut $Name $(if ($Name -eq 'omarchy') { 'Omarchy' } else { "Omarchy ($Name)" }) | Out-Null
+
 if (-not $NoStart) {
     Write-Host 'Starting it now ...'
     & (Join-Path $PSScriptRoot 'hyprland-wsl.ps1') -Distro $Name

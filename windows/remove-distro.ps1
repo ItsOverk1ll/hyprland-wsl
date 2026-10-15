@@ -21,6 +21,7 @@ param(
     [switch] $ProfilesOnly
 )
 
+. (Join-Path $PSScriptRoot 'common.ps1')
 $lxss = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
 $terminalSettings = @(
     "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
@@ -62,6 +63,7 @@ function Get-DistroLeftovers([string] $distro) {
         Exists   = [bool]$reg
         Base     = if ($reg.BasePath) { $reg.BasePath -replace '^\\\\\?\\', '' }
         Profiles = @($profiles)
+        Shortcuts = @(Find-Shortcuts (Get-DistroShortcutNote $distro))
         Package  = $package
     }
 }
@@ -98,6 +100,7 @@ function Remove-DistroCompletely($leftovers) {
         Remove-Item $leftovers.Base
     }
     if ($leftovers.Profiles) { Remove-TerminalProfiles $leftovers.Profiles }
+    $leftovers.Shortcuts | Remove-Item -ErrorAction SilentlyContinue
     if ($leftovers.Package) { $leftovers.Package | Remove-AppxPackage }
 }
 
@@ -105,6 +108,7 @@ function Format-Leftovers($leftovers) {
     $lines = @()
     if ($leftovers.Exists) { $lines += "the distro and its disk$(if ($leftovers.Base) { " ($($leftovers.Base))" })" }
     foreach ($p in $leftovers.Profiles) { $lines += "Windows Terminal profile '$($p.Name)'" }
+    foreach ($s in $leftovers.Shortcuts) { $lines += "shortcut '$([IO.Path]::GetFileNameWithoutExtension($s))'" }
     if ($leftovers.Package) { $lines += "Microsoft Store app $($leftovers.Package.Name)" }
     $lines
 }
@@ -114,7 +118,7 @@ if ($MyInvocation.InvocationName -eq '.') { return }   # dot-sourced: functions 
 $ErrorActionPreference = 'Stop'
 foreach ($n in $DistroName) {
     $l = Get-DistroLeftovers $n
-    if ($ProfilesOnly) { $l.Exists = $false; $l.Base = $null; $l.Package = $null }
+    if ($ProfilesOnly) { $l.Exists = $false; $l.Base = $null; $l.Package = $null; $l.Shortcuts = @() }
     $what = @(Format-Leftovers $l)
     if (-not $what) { Write-Host "${n}: nothing to remove."; continue }
     Write-Host "${n}:"; $what | ForEach-Object { Write-Host "  - $_" }

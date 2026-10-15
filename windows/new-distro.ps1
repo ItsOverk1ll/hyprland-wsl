@@ -107,6 +107,8 @@ Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss | Where-Objec
     (Get-ItemProperty $_.PSPath).DistributionName -eq $Name } | ForEach-Object {
     Set-ItemProperty $_.PSPath RunOOBE 0 -Type DWord }
 if ($SetDefault) { wsl.exe --set-default $Name | Out-Null }
+# Its own Start menu entry, e.g. "Arch Linux (myarch)"; removing the distro removes it.
+$shortcut = Set-DistroShortcut $Name "$($src.Title) ($Name)"
 
 $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes)
 Step "$($src.Title) is ready as '$Name' ($minutes min). User $User, hostname $Hostname, main key $Mod."

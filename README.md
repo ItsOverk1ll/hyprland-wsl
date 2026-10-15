@@ -176,6 +176,10 @@ and starts the one you pick:
 hyprland-wsl
 ```
 
+It is also in the Start menu as **Hyprland on WSL**, and every distro made from the menu gets
+an entry of its own ("Arch Linux (myarch)", "Omarchy") that starts it directly. Removing the
+distro removes its entry. `install-command.ps1 -Desktop` puts the menu on the desktop too.
+
 `bootstrap.ps1` and `install-omarchy.ps1` set the command up; without them, run
 `.\windows\install-command.ps1` once (it adds `%LOCALAPPDATA%\hyprland-wsl\bin` to your user
 PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu without it.

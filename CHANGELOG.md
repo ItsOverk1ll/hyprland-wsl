@@ -2,6 +2,17 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: Start menu entries
+
+### Added
+
+- **"Hyprland on WSL" in the Start menu** opens the menu. `install-command.ps1` (and so the
+  one-line install) adds it; `-Desktop` adds a desktop shortcut too, which the bootstrap offers.
+- **Every distro made from the menu gets its own Start menu entry**, such as "Arch Linux
+  (myarch)" or "Omarchy", with the distro's icon, starting it directly. Removing the distro
+  (Ctrl+D or `remove-distro.ps1`) removes its entry, and `install-command.ps1 -Remove` removes
+  all of hyprland-wsl's shortcuts.
+
 ## 2026-10-15: One-line install for Windows
 
 ### Added
