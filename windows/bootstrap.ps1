@@ -188,49 +188,77 @@ No Linux system is installed yet: you choose one in the menu that opens at the e
 # ---------------------------------------------------------------------------------------------
 Step 'Checking WSL'
 $os = [Environment]::OSVersion.Version
-if ($os.Major -lt 10 -or $os.Build -lt 19041) {
-    Stop-Here "This Windows is too old for WSL 2 (build $($os.Build)). Windows 10 version 2004 or newer is needed; Windows Update can bring it up to date."
+if ($os.Major -lt 10 -or $os.Build -lt 19044) {
+    Stop-Here "This Windows is too old for WSL 2 (build $($os.Build)). Windows 10 version 21H2 or newer is needed; Windows Update can bring it up to date."
 }
 
 $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
 $env:WSL_UTF8 = 1
-$status = ''
-if (Test-Path $wsl) { $status = (Invoke-Program { & $wsl --status }) -join "`n" }
+# wsl's output as text. The old WSL built into Windows ignores WSL_UTF8 and writes UTF-16, which
+# Windows PowerShell reads with a zero between every letter; those are taken out.
+function Invoke-Wsl([string[]] $wslArgs) {
+    if (-not (Test-Path $wsl)) { $global:LASTEXITCODE = 1; return '' }
+    ((Invoke-Program { & $wsl @wslArgs }) -join "`n") -replace "`0", ''
+}
 
-if (-not (Test-Path $wsl) -or $status -match 'not installed|--install|is not enabled|Optional Component') {
-    Say 'WSL is not installed yet. Installing it now; Windows asks for permission (a "Yes" prompt).'
-    $out = Invoke-Program { & $wsl --install --no-distribution }
-    if ($LASTEXITCODE -ne 0) {
-        Info (($out | Select-Object -Last 2) -join ' ')
-        Stop-Here 'Installing WSL did not finish. Open PowerShell as administrator (right-click it, "Run as administrator") and paste the same command again.'
+# WSL 2 needs the CPU's virtualization switched on. With Windows' own hypervisor running, Windows
+# reports the firmware setting as off, so that is checked first. Checked before anything is
+# installed, so that nobody restarts for nothing.
+$computer = Get-CimInstance Win32_ComputerSystem
+$firmware = (Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled
+if (-not $computer.HypervisorPresent -and -not $firmware) {
+    if ("$($computer.Manufacturer) $($computer.Model)" -match 'VirtualBox|VMware|Virtual Machine|QEMU|KVM|Parallels') {
+        Stop-Here "This Windows runs in a virtual machine ($($computer.Model)) without nested virtualization, which WSL 2 needs. Shut the virtual machine down and turn it on in its settings (VirtualBox: Settings > System > Processor > Enable Nested VT-x/AMD-V; VMware: Virtualize Intel VT-x/EPT), then run this again."
     }
-    $changed.Add('Installed WSL')
+    Stop-Here 'Virtualization is switched off in your PC''s firmware. Turn on "Intel VT-x" or "AMD SVM" in the BIOS/UEFI settings (usually under CPU or Advanced), then run this again.'
+}
+
+# The current WSL knows --version. The old one built into Windows 10 does not, and lacks most of
+# what is needed here (no --update, no --install --no-distribution); the current one is
+# installed from Microsoft's release on GitHub, where it takes over from the old one.
+Invoke-Wsl '--version' | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Say 'This PC has the old WSL that came with Windows. Installing the current WSL from Microsoft;'
+    Say 'Windows asks for permission (a "Yes" prompt).'
+    try {
+        $release = Invoke-RestMethod 'https://api.github.com/repos/microsoft/WSL/releases/latest' -Headers @{ 'User-Agent' = 'hyprland-wsl' }
+        $asset = $release.assets | Where-Object { $_.name -match "^wsl\.[\d.]+\.$arch\.msi$" } | Select-Object -First 1
+        if (-not $asset) { throw "no $arch installer in WSL $($release.tag_name)" }
+        $msi = Join-Path $env:TEMP $asset.name
+        Get-File $asset.browser_download_url $msi "WSL $($release.tag_name)"
+        $proc = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/quiet', '/norestart' -Verb RunAs -Wait -PassThru
+        Remove-Item $msi -ErrorAction SilentlyContinue
+        if ($proc.ExitCode -notin 0, 3010) { throw "the installer stopped (exit $($proc.ExitCode))" }
+    } catch { Info "That did not work: $($_.Exception.Message)" }
+    Invoke-Wsl '--version' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Stop-Here 'The current WSL could not be installed. Install "Windows Subsystem for Linux" from the Microsoft Store (or run Windows Update), then paste the same command again.'
+    }
+    $changed.Add('Installed the current WSL')
+}
+
+# The current WSL says when the Windows features it needs are not switched on yet.
+# A WSL without distros yet also mentions "wsl --install", so only these count as missing features.
+$status = Invoke-Wsl '--status'
+$fine = $status -match 'Default Version|Default Distribution|no installed distributions'
+$missing = $status -match 'Virtual Machine Platform|Optional Component|not enabled|not supported with your current machine|0x80370102|HYPERV_NOT_INSTALLED'
+if ($missing -or ($LASTEXITCODE -ne 0 -and -not $fine)) {
+    Say 'WSL needs two Windows features switched on. Doing that now; Windows asks for permission (a "Yes" prompt).'
+    $out = Invoke-Wsl '--install', '--no-distribution'
+    if ($LASTEXITCODE -ne 0) {
+        Info (($out -split "`n" | Where-Object { $_.Trim() } | Select-Object -Last 2) -join ' ')
+        Stop-Here 'Switching on WSL did not finish. Open PowerShell as administrator (right-click it, "Run as administrator") and paste the same command again.'
+    }
+    $changed.Add('Switched on WSL')
     Stop-Here @"
 WSL is installed. Windows needs a restart to finish it.
 Restart your PC, then open PowerShell and paste the same command again; it carries on from here.
 "@
 }
 
-# The WSL from the Microsoft Store knows --version; the old one built into Windows does not.
-Invoke-Program { & $wsl --version } | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Say 'Updating WSL to the current version ...'
-    Invoke-Program { & $wsl --update } | Out-Null
-    if ($LASTEXITCODE -ne 0) { Stop-Here 'WSL could not be updated. Open PowerShell as administrator and run: wsl --update' }
-    $changed.Add('Updated WSL')
-}
-
 if ($status -match 'Default Version:\s*1') {
-    Invoke-Program { & $wsl --set-default-version 2 } | Out-Null
+    Invoke-Wsl '--set-default-version', '2' | Out-Null
     $changed.Add('Set WSL 2 as the default version (it was WSL 1)')
-}
-
-# WSL 2 needs the CPU's virtualization switched on in the PC's firmware. With Windows' own
-# hypervisor running, Windows reports the firmware setting as off, so check that first.
-$hypervisor = (Get-CimInstance Win32_ComputerSystem).HypervisorPresent
-$firmware = (Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled
-if (-not $hypervisor -and -not $firmware) {
-    Stop-Here 'Virtualization is switched off in your PC''s firmware. Turn on "Intel VT-x" or "AMD SVM" in the BIOS/UEFI settings (usually under CPU or Advanced), then run this again.'
 }
 Say 'WSL 2 is ready.'
 

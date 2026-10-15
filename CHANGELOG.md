@@ -2,6 +2,26 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: The one-line install with Windows 10's old WSL
+
+### Fixed
+
+- **On Windows 10 with the old WSL that came with Windows**, the setup told you to run
+  `wsl --update`, which that WSL does not have. It now installs the current WSL from
+  Microsoft's release on GitHub (Windows asks for permission), which takes over from the old one,
+  and then switches on the Windows features WSL needs, followed by one restart.
+- The old WSL writes its messages in a form Windows PowerShell 5.1 reads with a zero between
+  every letter, so the setup could not tell that WSL still needed setting up. Those are now taken
+  out before the messages are read.
+- A WSL without distros no longer counts as "not set up" because its message mentions
+  `wsl --install`.
+
+### Changed
+
+- Virtualization is checked before anything is installed. In a virtual machine (VirtualBox,
+  VMware, Hyper-V and others), the message says how to switch on nested virtualization.
+- The minimum is Windows 10 version 21H2 (build 19044), what the current WSL needs.
+
 ## 2026-10-15: The one-line install on fresh Windows 10 and 11
 
 ### Changed

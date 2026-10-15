@@ -18,10 +18,11 @@ combination. Nothing about Windows is replaced.
 
 ## What you need
 
-- **Windows 11**, or **Windows 10 version 22H2**. To check: press **Win+R**, type `winver`,
+- **Windows 11**, or **Windows 10 version 21H2 or newer** (22H2 is the latest). To check: press **Win+R**, type `winver`,
   press Enter.
 - **Virtualization switched on.** Most PCs have it on already. If it is off, the installer tells
-  you, and how to switch it on.
+  you, and how to switch it on. Inside a virtual machine (VirtualBox, VMware), "nested
+  virtualization" must be switched on in the virtual machine's settings, and things run slower.
 - **About 5 GB of free disk space** for one Linux system (11 GB for Omarchy).
 - **An internet connection.**
 - **A graphics card is not required.** With one (any recent NVIDIA, AMD or Intel graphics
