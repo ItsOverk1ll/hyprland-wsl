@@ -176,6 +176,10 @@ Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks no
 installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
 Omarchy's own setup.
 
+New distros get their folder under `C:\WSL` unless the `HYPRLAND_WSL_DISTROS` environment
+variable names another place, for example a separate drive:
+`[Environment]::SetEnvironmentVariable('HYPRLAND_WSL_DISTROS', 'P:\WSL', 'User')`.
+
 Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing else is in it,
 its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
 `-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if

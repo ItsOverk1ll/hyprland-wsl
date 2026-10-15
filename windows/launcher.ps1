@@ -219,15 +219,15 @@ function New-Distro($distros) {
 
     if ($kind -eq 'omarchy') {
         $name = Get-FreeName 'omarchy' $distros
-        Write-Host "`n  ${accent}New Omarchy instance '$name'$reset ${dim}in C:\WSL\$name$reset`n"
-        & pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'install-omarchy.ps1') -Name $name -Location "C:\WSL\$name"
+        Write-Host "`n  ${accent}New Omarchy instance '$name'$reset ${dim}in $distroRoot\$name$reset`n"
+        & pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'install-omarchy.ps1') -Name $name -Location "$distroRoot\$name"
         return
     }
 
     Write-Host "`n  ${accent}New $title$reset  ${dim}Enter keeps the value in brackets. Ctrl+C closes the menu.$reset`n"
     $name = Read-Field 'Name' (Get-FreeName $kind $distros) '^[A-Za-z0-9._-]+$' 'Letters, digits, dots, dashes and underscores.'
     if ($name -in $distros.Name) { Write-Host "  ${warn}'$name' exists already.$reset"; Start-Sleep 2; return }
-    $folder = Read-Field 'Folder' "C:\WSL\$name" $null ''
+    $folder = Read-Field 'Folder' "$distroRoot\$name" $null ''
     $me = ($env:USERNAME.ToLower() -replace '[^a-z0-9_-]', '')
     if ($me -notmatch '^[a-z_]') { $me = 'user' }
     $user = Read-Field 'User' $me '^(?!root$)[a-z_][a-z0-9_-]{0,31}$' 'Lower case letters, digits, - and _, starting with a letter.'

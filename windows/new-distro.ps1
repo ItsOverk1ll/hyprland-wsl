@@ -11,7 +11,7 @@
 param(
     [Parameter(Mandatory)] [ValidateSet('arch', 'cachyos', 'kali', 'ubuntu', 'mint')] [string] $Distro,
     [Parameter(Mandatory)] [string] $Name,
-    [string] $Location,                # folder for the distro's disk; default C:\WSL\<name>
+    [string] $Location,                # folder for the distro's disk; default C:\WSL\<name> (see common.ps1)
     [Parameter(Mandatory)] [string] $User,
     [securestring] $Password,
     [string] $Hostname,                # default: the name
@@ -41,7 +41,7 @@ if ($Name -notmatch '^[A-Za-z0-9._-]+$') { throw 'The name can have letters, dig
 if ($User -notmatch '^[a-z_][a-z0-9_-]{0,31}$' -or $User -eq 'root') { throw 'The user name has to be lower case letters, digits, - and _, starting with a letter.' }
 if (-not $Hostname) { $Hostname = $Name -replace '[^A-Za-z0-9-]', '-' }
 if ($Hostname -notmatch '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$') { throw 'The hostname can have letters, digits and dashes.' }
-if (-not $Location) { $Location = "C:\WSL\$Name" }
+if (-not $Location) { $Location = "$distroRoot\$Name" }
 if ($Name -in ((wsl.exe -l -q) | ForEach-Object { $_.Trim() })) { throw "A distro called '$Name' exists already." }
 if (-not $Password) {
     $Password = Read-Host "Password for $User" -AsSecureString
