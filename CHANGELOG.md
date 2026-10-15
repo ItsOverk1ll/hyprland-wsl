@@ -15,6 +15,10 @@ What changed, newest first. The project has no version numbers yet, so entries g
   out before the messages are read.
 - A WSL without distros no longer counts as "not set up" because its message mentions
   `wsl --install`.
+- On a Windows 10 without its updates from November 2022 on (before build 19044.2311 or
+  19045.2311), Windows' own `wsl` cannot hand over to the current WSL, so installing it did not
+  help. The setup now says to run Windows Update first, and uses the current WSL from its own
+  folder once it is installed.
 
 ### Changed
 

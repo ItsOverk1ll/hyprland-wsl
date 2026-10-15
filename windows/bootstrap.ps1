@@ -193,8 +193,20 @@ $os = [Environment]::OSVersion.Version
 if ($os.Major -lt 10 -or $os.Build -lt 19044) {
     Stop-Here "This Windows is too old for WSL 2 (build $($os.Build)). Windows 10 version 21H2 or newer is needed; Windows Update can bring it up to date."
 }
+# Windows 10 only hands "wsl" over to the current WSL from its November 2022 update on
+# (KB5020030, build 19044.2311 / 19045.2311). Without it, the current WSL cannot be used.
+$ubr = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue).UBR
+if ($os.Build -lt 22000 -and $ubr -and $ubr -lt 2311) {
+    Stop-Here @"
+This Windows 10 is missing updates that WSL needs (it is build $($os.Build).$ubr; $($os.Build).2311 or newer is needed).
+Open Settings > Update & Security > Windows Update, install everything it offers, restart,
+then paste the same command again.
+"@
+}
 
-$wsl = Join-Path $env:SystemRoot 'System32\wsl.exe'
+# The current WSL lives in Program Files; Windows' own wsl.exe hands over to it.
+$wsl = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
+if (-not (Test-Path $wsl)) { $wsl = Join-Path $env:SystemRoot 'System32\wsl.exe' }
 $env:WSL_UTF8 = 1
 # wsl's output as text. The old WSL built into Windows ignores WSL_UTF8 and writes UTF-16, which
 # Windows PowerShell reads with a zero between every letter; those are taken out.
@@ -234,6 +246,8 @@ if ($LASTEXITCODE -ne 0) {
         Remove-Item $msi -ErrorAction SilentlyContinue
         if ($proc.ExitCode -notin 0, 3010) { throw "the installer stopped (exit $($proc.ExitCode))" }
     } catch { Info "That did not work: $($_.Exception.Message)" }
+    $installed = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
+    if (Test-Path $installed) { $wsl = $installed }
     Invoke-Wsl '--version' | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Stop-Here 'The current WSL could not be installed. Install "Windows Subsystem for Linux" from the Microsoft Store (or run Windows Update), then paste the same command again.'
