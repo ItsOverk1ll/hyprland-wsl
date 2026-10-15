@@ -22,8 +22,8 @@ $ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = 1
 if (-not $Password) { $Password = $User }
 
-$repo = Split-Path $PSScriptRoot -Parent
-$script = '/mnt/' + $repo.Substring(0, 1).ToLower() + $repo.Substring(2).Replace([char]92, [char]47) + '/tools/omarchy-wsl.sh'
+. (Join-Path $PSScriptRoot 'common.ps1')
+$script = (Get-RepoWslPath) + '/tools/omarchy-wsl.sh'
 
 $existing = (wsl.exe -l -q) | ForEach-Object { $_.Trim() }
 if ($existing -notcontains $Name) {
@@ -52,6 +52,9 @@ if ($LASTEXITCODE) { throw 'The Omarchy installer kept asking for a restart.' }
 # from the next start.
 wsl.exe -t $Name | Out-Null
 Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name"
+# "hyprland-wsl" in Windows terminals: the menu, or a session with -Distro.
+& (Join-Path $PSScriptRoot 'install-command.ps1')
+
 if (-not $NoStart) {
     Write-Host 'Starting it now ...'
     & (Join-Path $PSScriptRoot 'hyprland-wsl.ps1') -Distro $Name

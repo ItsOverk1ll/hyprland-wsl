@@ -66,6 +66,9 @@ The installer:
 - builds a patched copy of aquamarine, in the version the distro ships, into `/opt/hyprland-wsl`
   (the system package is untouched)
 - installs the `hyprland-wsl` launcher into `/usr/local/bin`
+- makes `hyprland-wsl` a command in Windows terminals too, which opens a
+  [menu of your distros](#a-menu-of-your-distros) (`HYPRLAND_WSL_WINDOWS_COMMAND=0 ./install.sh`
+  skips this)
 - writes a default Hyprland config if there is none, with ALT as the main modifier and foot as
   the terminal
 
@@ -117,7 +120,8 @@ side instead. It starts the session and shows it with a VNC viewer that runs on 
 full screen, with the keyboard captured:
 
 ```powershell
-.\windows\hyprland-wsl.cmd -Distro <distro>              # full screen
+hyprland-wsl -Distro <distro>                           # full screen, from any Windows terminal
+.\windows\hyprland-wsl.cmd -Distro <distro>              # the same, from the checkout
 .\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
 .\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered
 .\windows\hyprland-wsl.cmd -Distro <distro> -Software    # draw on the CPU
@@ -142,12 +146,17 @@ hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
 
 ### A menu of your distros
 
-`windows\launcher.cmd` opens a menu in the terminal that lists every WSL distro, shows which
-ones have hyprland-wsl and what they render on, and starts the one you pick:
+Type `hyprland-wsl` in any Windows terminal (PowerShell, cmd, Windows Terminal). It opens a
+menu that lists every WSL distro, shows which ones have hyprland-wsl and what they render on,
+and starts the one you pick:
 
 ```powershell
-.\windows\launcher.cmd
+hyprland-wsl
 ```
+
+`install.sh` and `install-omarchy.ps1` set the command up; without them, run
+`.\windows\install-command.ps1` once (it adds `%LOCALAPPDATA%\hyprland-wsl\bin` to your user
+PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu without it.
 
 | Key | Action |
 | --- | --- |
@@ -158,7 +167,7 @@ ones have hyprland-wsl and what they render on, and starts the one you pick:
 | Esc | close |
 
 The top row, **+ New Omarchy instance**, runs `install-omarchy.ps1` with a name and folder you
-choose. The menu needs fzf (`winget install junegunn.fzf`). It looks at each distro once, by
+choose. The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and `winget install junegunn.fzf`). It looks at each distro once, by
 starting it, and remembers the answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours
 follow the current BetterHotkeys theme when that is installed,
 and Omarchy's Hackerman otherwise.
@@ -271,3 +280,4 @@ The frame rate at TigerVNC's own viewer has not been measured; that viewer does 
 ```
 
 Removes the launcher and the patched library. Packages, the user and `~/.config/hypr` stay.
+The Windows command is removed with `.\windows\install-command.ps1 -Remove`.

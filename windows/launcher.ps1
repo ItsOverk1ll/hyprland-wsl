@@ -13,8 +13,9 @@ $ErrorActionPreference = 'Stop'
 # UTF-8 without BOM, otherwise the first line piped to fzf starts with U+FEFF
 [Console]::OutputEncoding = $OutputEncoding = [Text.UTF8Encoding]::new($false)
 $env:WSL_UTF8 = 1
-$repo = Split-Path $PSScriptRoot -Parent
-$wslRepo = '/mnt/' + $repo.Substring(0, 1).ToLower() + $repo.Substring(2).Replace([char]92, [char]47)
+. (Join-Path $PSScriptRoot 'common.ps1')
+# Sent to each distro on stdin, so it works wherever the checkout is.
+$infoScript = (Get-Content (Join-Path $repo 'tools\distro-info.sh') -Raw) -replace "`r", ''
 $dataDir = Join-Path $env:LOCALAPPDATA 'hyprland-wsl'
 $cacheFile = Join-Path $dataDir 'distros.json'
 $previewDir = Join-Path $env:TEMP 'hyprland-wsl-launcher'
@@ -77,7 +78,7 @@ function Save-Cache($cache) { $cache | ConvertTo-Json -Depth 4 | Set-Content $ca
 # Starts the distro briefly to read what tools/distro-info.sh reports.
 function Get-DistroInfo($name) {
     $info = @{ scanned = (Get-Date).ToString('yyyy-MM-dd HH:mm') }
-    $out = wsl.exe -d $name -u root -- sh "$wslRepo/tools/distro-info.sh" 2>$null
+    $out = $infoScript | wsl.exe -d $name -u root -- sh -s 2>$null
     foreach ($line in $out) {
         if ($line -match '^([a-z]+)=(.*)$') { $info[$Matches[1]] = $Matches[2].Trim() }
     }
@@ -91,7 +92,7 @@ function Update-Cache($cache, $distros, [switch]$All) {
         # Each look starts the distro, which takes a few seconds; they run side by side.
         $getInfo = ${function:Get-DistroInfo}.ToString()
         $found = $todo | ForEach-Object -ThrottleLimit 6 -Parallel {
-            $wslRepo = $using:wslRepo; $env:WSL_UTF8 = 1
+            $infoScript = $using:infoScript; $env:WSL_UTF8 = 1
             ${function:Get-DistroInfo} = $using:getInfo
             @{ name = $_.Name; info = Get-DistroInfo $_.Name }
         }
@@ -152,7 +153,7 @@ function Install-HyprlandWsl($d, $info) {
     Clear-Host
     Write-Host "`n  ${accent}Install hyprland-wsl into $($d.Name)?$reset  ${dim}(y/N)$reset " -NoNewline
     if ([Console]::ReadLine() -notmatch '^y') { return }
-    wsl.exe -d $d.Name -u root -- bash "$wslRepo/install.sh"
+    wsl.exe -d $d.Name -u root -- bash "$(Get-RepoWslPath)/install.sh"
     Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null
 }
 

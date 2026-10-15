@@ -12,6 +12,17 @@ What changed, newest first. The project has no version numbers yet, so entries g
   window, Ctrl+T stops it. Distros without hyprland-wsl offer to install it, and a top row
   makes a new Omarchy instance.
 - `tools/distro-info.sh`, what the menu asks each distro.
+- **`hyprland-wsl` in Windows terminals.** Typed without arguments it opens the menu; with
+  `-Distro NAME` and the other options it starts that distro, as `windows\hyprland-wsl.ps1`
+  does. `install.sh` (through WSL's Windows interop) and `install-omarchy.ps1` set it up;
+  `windows\install-command.ps1` does it by hand and `-Remove` undoes it.
+
+### Changed
+
+- `windows\hyprland-wsl.ps1` (and `.cmd`) with no arguments at all opens the menu instead of
+  starting the default distro. `-Distro NAME` starts a distro as before.
+- The menu works with a checkout inside a distro (`\\wsl.localhost\...`): what it asks each
+  distro goes over stdin, and installs copy the checkout to `%LOCALAPPDATA%` first.
 
 ## 2026-10-15: Omarchy's first-boot setup
 
