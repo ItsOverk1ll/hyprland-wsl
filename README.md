@@ -180,7 +180,8 @@ Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing
 its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
 `-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if
 any. The menu lists all of it before you confirm. Terminal's settings are backed up to
-`%LOCALAPPDATA%\hyprland-wslackups` first. Without the menu: `.\windowsemove-distro.ps1 -Name NAME`.
+`%LOCALAPPDATA%\hyprland-wsl\backups` first. Without the menu: `.\windows\remove-distro.ps1 -Name NAME`.
+emove-distro.ps1 -Name NAME`.
 
 The same works without the menu:
 

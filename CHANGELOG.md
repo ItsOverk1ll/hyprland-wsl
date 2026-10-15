@@ -17,7 +17,7 @@ What changed, newest first. The project has no version numbers yet, so entries g
 - **Ctrl+D** in the menu removes a distro completely, after you type its name: the distro
   (`wsl --unregister`), its folder when empty, its Windows Terminal profiles (WSL's and ones
   you made that start it), and the Microsoft Store app it was installed from. Terminal's
-  settings are backed up first. `windowsemove-distro.ps1` does the same from the command line.
+  settings are backed up first. `windows\remove-distro.ps1` does the same from the command line.
 
 ### Fixed
 
