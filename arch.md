@@ -3,14 +3,14 @@
 Arch is the best-supported distro: Hyprland comes from its own repositories at the newest
 version, and it renders on the GPU at a steady 60 updates a second at 1920x1080.
 
-## With the launcher
+## With the menu
 
 `hyprland-wsl` → **+ New distro** → **Arch Linux**, then the form.
 
 ## One command
 
 ```powershell
-& "$env:LOCALAPPDATA\hyprland-wsl\launcher\new-distro.ps1" -Distro arch -Name arch -User me
+& "$env:LOCALAPPDATA\hyprland-wsl\repo\windows\new-distro.ps1" -Distro arch -Name arch -User me
 ```
 
 Options: `-Location D:\WSL\arch`, `-Hostname`, `-Mod ALT`, `-SetDefault`, `-Start`.

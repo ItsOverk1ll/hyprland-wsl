@@ -2,7 +2,7 @@
 
 ## A distro you already have
 
-In the launcher menu, select it: one without hyprland-wsl offers to install it (Enter). Or
+In the menu, select it: one without hyprland-wsl offers to install it (Enter). Or
 inside it:
 
 ```sh

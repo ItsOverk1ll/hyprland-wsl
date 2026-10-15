@@ -3,14 +3,14 @@
 Kali rolling has Hyprland in its own repositories, at the same version as Arch, and renders on
 the GPU. Kali is heavier in general than the others.
 
-## With the launcher
+## With the menu
 
 `hyprland-wsl` → **+ New distro** → **Kali Linux**, then the form.
 
 ## One command
 
 ```powershell
-& "$env:LOCALAPPDATA\hyprland-wsl\launcher\new-distro.ps1" -Distro kali -Name kali -User me
+& "$env:LOCALAPPDATA\hyprland-wsl\repo\windows\new-distro.ps1" -Distro kali -Name kali -User me
 ```
 
 ## By hand
@@ -42,5 +42,5 @@ Then `wsl -t kali` and `.\windows\hyprland-wsl.cmd -Distro kali`.
   hyprland-wsl mounts its patched library instead of using `LD_LIBRARY_PATH`; see
   [how it works](https://github.com/ItsOverk1ll/hyprland-wsl/blob/main/docs/how-it-works.md).
 - A second small `Hyprland` process is libseat's seat helper. Normal.
-- A Kali installed from the Microsoft Store comes with a Store app as well; the launcher's
+- A Kali installed from the Microsoft Store comes with a Store app as well; the menu's
   Ctrl+D removes that too.

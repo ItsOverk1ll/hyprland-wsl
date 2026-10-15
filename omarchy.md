@@ -1,4 +1,8 @@
-# Omarchy
+# Omarchy (in progress)
+
+> **In progress.** Omarchy installs and runs, but parts of it still need work in WSL: see
+> [Known gaps](#known-gaps) and [What is different from a real Omarchy](#what-is-different-from-a-real-omarchy).
+> Expect rough edges; Arch Linux is the recommended choice for now.
 
 [Omarchy](https://omarchy.org) is DHH's Linux distribution: Arch Linux with Hyprland, its own
 desktop shell, themes, menus and a large set of preinstalled tools. It is meant to be installed
@@ -7,7 +11,7 @@ WSL instance instead and puts hyprland-wsl on top, so Omarchy's desktop runs on 
 
 Tested on 2026-10-13 with Omarchy 4.0.4, from a clean install, by scripts and screenshots.
 
-## With the launcher
+## With the menu
 
 `hyprland-wsl` → **+ New distro** → **Omarchy**. It asks nothing: it picks the next free name
 (`omarchy`, `omarchy2`, ...) and starts installing; Omarchy's own setup asks the rest on the
@@ -16,7 +20,7 @@ first start, described below.
 ## One command
 
 In PowerShell, in a clone of hyprland-wsl's [main branch](https://github.com/ItsOverk1ll/hyprland-wsl)
-(the launcher keeps one at `%LOCALAPPDATA%\hyprland-wsl\repo`):
+(the one-line installer keeps one at `%LOCALAPPDATA%\hyprland-wsl\repo`):
 
 ```powershell
 .\windows\install-omarchy.ps1

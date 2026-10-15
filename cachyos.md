@@ -3,15 +3,15 @@
 CachyOS is Arch with its own optimised packages. It has no WSL image, so it comes from its
 Docker image, which can be imported into WSL without Docker. After that it behaves like Arch.
 
-## With the launcher
+## With the menu
 
-`hyprland-wsl` → **+ New distro** → **CachyOS**, then the form. The launcher downloads the image
+`hyprland-wsl` → **+ New distro** → **CachyOS**, then the form. The menu downloads the image
 itself.
 
 ## One command
 
 ```powershell
-& "$env:LOCALAPPDATA\hyprland-wsl\launcher\new-distro.ps1" -Distro cachyos -Name cachyos -User me
+& "$env:LOCALAPPDATA\hyprland-wsl\repo\windows\new-distro.ps1" -Distro cachyos -Name cachyos -User me
 ```
 
 ## By hand

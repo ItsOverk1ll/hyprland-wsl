@@ -12,14 +12,14 @@ The two PPAs are not part of Mint and are not checked by this project:
   the GPU. Mint's own Mesa (25.2) leaves the picture blank on the GPU; without this PPA Hyprland
   renders on the CPU.
 
-## With the launcher
+## With the menu
 
 `hyprland-wsl` → **+ New distro** → **Linux Mint 22.3**, then the form. It asks about the PPAs.
 
 ## One command
 
 ```powershell
-& "$env:LOCALAPPDATA\hyprland-wsl\launcher\new-distro.ps1" -Distro mint -Name mint -User me -AllowPpa
+& "$env:LOCALAPPDATA\hyprland-wsl\repo\windows\new-distro.ps1" -Distro mint -Name mint -User me -AllowPpa
 ```
 
 ## By hand
@@ -34,7 +34,7 @@ wsl --import mint C:\WSL\mint C:\WSL\images\mint\rootfs.tar.gz
 wsl -d mint -u root
 ```
 
-(The launcher, which may run with no distro installed yet, imports the first layer as a
+(The menu, which may run with no distro installed yet, imports the first layer as a
 throwaway distro for the merge instead.)
 
 The image is Mint's package build environment and still identifies as Ubuntu. Inside, as root,

@@ -3,14 +3,14 @@
 Ubuntu 26.04 works, with an older Hyprland (0.53.3) than the other distros, and it is the least
 smooth of them. Arch, CachyOS or Kali are better choices if you have no reason to use Ubuntu.
 
-## With the launcher
+## With the menu
 
 `hyprland-wsl` → **+ New distro** → **Ubuntu 26.04**, then the form.
 
 ## One command
 
 ```powershell
-& "$env:LOCALAPPDATA\hyprland-wsl\launcher\new-distro.ps1" -Distro ubuntu -Name ubuntu -User me
+& "$env:LOCALAPPDATA\hyprland-wsl\repo\windows\new-distro.ps1" -Distro ubuntu -Name ubuntu -User me
 ```
 
 ## By hand
