@@ -88,8 +88,9 @@ if (Test-Vnc) { throw "Something already answers on port $Port. Stop that sessio
 
 # A distro can have a setup that has to run once, in a terminal, before its first session
 # (Omarchy's first-boot setup, for one). This runs it here, in this console, if there is one.
+# Exit code 2 is a launcher from before this command existed: nothing to set up.
 & wsl.exe @wsl hyprland-wsl first-start
-if ($LASTEXITCODE) { throw "The distro's first-start setup did not finish. Start again to retry." }
+if ($LASTEXITCODE -and $LASTEXITCODE -ne 2) { throw "The distro's first-start setup did not finish. Start again to retry." }
 
 Write-Host "Starting Hyprland at $Size, scale $scaleText ..."
 $launch = @('hyprland-wsl', $Size, '--scale', $scaleText, '--port', $Port, '--fps', $Fps, '--no-viewer')
