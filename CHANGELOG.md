@@ -2,6 +2,21 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: Three branches
+
+### Changed
+
+- **The launcher moved to its own branch,
+  [Launcher](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher)**, with a one-line
+  installer: the menu, new and removed distros, the `hyprland-wsl` command for Windows and
+  Win+Shift+H for BetterHotkeys. It downloads this branch (main) for what it needs.
+- **The distro guides moved to
+  [Operating-Systems](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems)**: one
+  guide per distro, with the notes that were in `docs/distros.md` and `docs/omarchy.md`.
+- main is hyprland-wsl itself. `install.sh` no longer adds the Windows command (the launcher's
+  installer does), and `windows\hyprland-wsl.ps1` without arguments starts the default distro
+  again instead of opening the menu.
+
 ## 2026-10-15: New and removed distros from the menu
 
 ### Added

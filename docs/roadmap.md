@@ -21,7 +21,7 @@ offers that).
 - Keyboard through VNC (Super+Q opens a terminal), screen size and scale at launch.
 - One installer for pacman- and apt-based distros, one launcher, a Windows-side launcher.
 - Clean shutdown.
-- Omarchy 4.0.4 in an Arch instance, installed by `windows\install-omarchy.ps1` (see [omarchy.md](omarchy.md)).
+- Omarchy 4.0.4 in an Arch instance, installed by `windows\install-omarchy.ps1` (see the [Omarchy guide](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/omarchy.md)).
 
 Ubuntu 26.04 passes the same checks from a clean install, with lower frame rates (see the gaps).
 

@@ -175,7 +175,7 @@ wsl_user_settings() {    # wsl_user_settings HOME OWNER
     # it draws on the CPU and Hyprland still composes on the GPU.
     local flags=$h/.config/chromium-flags.conf
     if [ -f "$flags" ] && ! grep -q -- '--disable-gpu' "$flags"; then
-        printf '%s\n' '# hyprland-wsl: see docs/omarchy.md' '--disable-gpu' >> "$flags"
+        printf '%s\n' '# hyprland-wsl: Chromium cannot use the GPU in WSL (see the Omarchy guide)' '--disable-gpu' >> "$flags"
     fi
     [ "$owner" = root ] || chown -R "$owner": "$h/.config/environment.d" "$h/.config/hypr/monitors.lua" "$flags" 2> /dev/null
     return 0

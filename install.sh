@@ -234,18 +234,7 @@ fi
 
 fi
 
-# "hyprland-wsl" in Windows terminals too (the menu of distros), through WSL's Windows interop.
-# HYPRLAND_WSL_WINDOWS_COMMAND=0 skips it.
-windows_command=
-if [ "${HYPRLAND_WSL_WINDOWS_COMMAND:-1}" != 0 ] && command -v wslpath > /dev/null; then
-    ps=$(command -v powershell.exe || ls /mnt/*/Windows/System32/WindowsPowerShell/v1.0/powershell.exe 2> /dev/null | head -n 1)
-    if [ -n "$ps" ] && (cd /mnt/c 2> /dev/null || cd /; "$ps" -NoLogo -NoProfile -ExecutionPolicy Bypass \
-            -File "$(wslpath -w "$HERE/windows/install-command.ps1")" 2>&1 | tr -d '\r'); then
-        windows_command=1
-    fi
-fi
-
 step "Done"
 echo "Start Hyprland with:  hyprland-wsl"
 echo "From Windows:         wsl -d ${WSL_DISTRO_NAME:-<distro>} hyprland-wsl"
-[ -n "$windows_command" ] && echo "                      or, in a new Windows terminal: hyprland-wsl  (a menu of your distros)"
+echo "A menu of your distros for Windows: https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher"

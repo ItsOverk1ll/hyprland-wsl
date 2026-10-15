@@ -6,7 +6,6 @@
 #
 #   .\hyprland-wsl.ps1 -Distro Ubuntu-26.04            full screen, keyboard captured
 #   .\hyprland-wsl.ps1 -Distro archlinux -Windowed     in a window
-#   .\hyprland-wsl.ps1                                 no arguments: the menu (launcher.ps1)
 #
 # Leaving full screen: Ctrl+Alt+Enter (TigerVNC 1.16; older versions used an F8 menu).
 # Closing the viewer ends the Hyprland session.
@@ -31,15 +30,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-if (-not $PSBoundParameters.Count) {
-    # The menu needs PowerShell 7.
-    $menu = Join-Path $PSScriptRoot 'launcher.ps1'
-    if ($PSVersionTable.PSVersion.Major -ge 7) { & $menu; exit $LASTEXITCODE }
-    if (Get-Command pwsh -ErrorAction SilentlyContinue) { & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File $menu; exit $LASTEXITCODE }
-    Write-Host 'The menu needs PowerShell 7 (winget install Microsoft.PowerShell).'
-    Write-Host 'To start a distro without it: hyprland-wsl -Distro NAME'
-    exit 1
-}
 $env:WSL_UTF8 = 1
 
 function Get-Viewer {

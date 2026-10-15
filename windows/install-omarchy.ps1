@@ -22,8 +22,17 @@ $ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = 1
 if (-not $Password) { $Password = $User }
 
-. (Join-Path $PSScriptRoot 'common.ps1')
-$script = (Get-RepoWslPath) + '/tools/omarchy-wsl.sh'
+# The checkout as a path the new instance can read: under /mnt for a Windows drive. A checkout
+# inside a distro (\\wsl.localhost\...) is only visible to that distro, so it is copied to
+# %LOCALAPPDATA%\hyprland-wsl\repo-copy first.
+$repo = Split-Path $PSScriptRoot -Parent
+if ($repo -notmatch '^[A-Za-z]:\\') {
+    $copy = Join-Path $env:LOCALAPPDATA 'hyprland-wsl\repo-copy'
+    robocopy $repo $copy /MIR /XD .git dev-log /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "Could not copy $repo to $copy." }
+    $repo = $copy
+}
+$script = '/mnt/' + $repo.Substring(0, 1).ToLower() + $repo.Substring(2).Replace([char]92, [char]47) + '/tools/omarchy-wsl.sh'
 
 $existing = (wsl.exe -l -q) | ForEach-Object { $_.Trim() }
 if ($existing -notcontains $Name) {
@@ -52,9 +61,6 @@ if ($LASTEXITCODE) { throw 'The Omarchy installer kept asking for a restart.' }
 # from the next start.
 wsl.exe -t $Name | Out-Null
 Write-Host "`nStart it later with:  $PSScriptRoot\hyprland-wsl.cmd -Distro $Name"
-# "hyprland-wsl" in Windows terminals: the menu, or a session with -Distro.
-& (Join-Path $PSScriptRoot 'install-command.ps1')
-
 if (-not $NoStart) {
     Write-Host 'Starting it now ...'
     & (Join-Path $PSScriptRoot 'hyprland-wsl.ps1') -Distro $Name

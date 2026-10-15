@@ -9,13 +9,23 @@ that screen in a window.
 
 The aim is to support all major Linux distributions under WSL2.
 
+## Branches
+
+| Branch | What it is |
+| --- | --- |
+| **main** (this one) | hyprland-wsl itself: the installer, the `hyprland-wsl` command inside WSL, the Windows viewer script, Omarchy's installer |
+| [**Launcher**](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher) | a menu for Windows that starts, creates and removes distros, opened with `hyprland-wsl` or Win+Shift+H. One-line install |
+| [**Operating-Systems**](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems) | step-by-step guides for installing each distro with hyprland-wsl |
+
+The easiest start: install the [launcher](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher), then pick **+ New distro** in its menu.
+
 ## Documentation
 
 - [How it works](docs/how-it-works.md): why Hyprland needs help under WSL and what each part does
-- [Distro notes](docs/distros.md): versions and quirks per distro
+- [Distro guides](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems): installing each distro, with its notes (Operating-Systems branch)
 - [Setting it up by hand](docs/manual-setup.md): the installer and launcher as individual steps
 - [Troubleshooting](docs/troubleshooting.md): error messages and what to do about them
-- [Omarchy](docs/omarchy.md): DHH's Hyprland distribution in a WSL instance
+- [Omarchy](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/omarchy.md): DHH's Hyprland distribution in a WSL instance
 - [Status and roadmap](docs/roadmap.md): what works, known gaps, what is planned
 - [Changelog](CHANGELOG.md): what changed and when
 
@@ -26,16 +36,18 @@ Tested on 2026-10-13 with WSL 2.5.9, each with a clean install:
 | Distro | Hyprland | Comes from | Notes |
 | --- | --- | --- | --- |
 | Arch Linux | 0.56.2 | distro repos | GPU |
-| CachyOS | 0.56.2 | distro repos | GPU; no WSL image, see [Distros without a WSL image](#distros-without-a-wsl-image) |
+| CachyOS | 0.56.2 | distro repos | GPU; no WSL image, imported from its Docker image |
 | Kali Linux (rolling) | 0.56.2 | distro repos | GPU |
-| Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format, and less smooth than the others (see [distro notes](docs/distros.md)) |
+| Ubuntu 26.04 | 0.53.3 | distro repos | GPU; older Hyprland with the `hyprland.conf` config format, and less smooth than the others |
 | Linux Mint 22.3 | 0.56.2 | third-party PPA | GPU with a newer Mesa from a second PPA, otherwise CPU; no WSL image; Mint has no Hyprland package of its own |
 
-[Omarchy](docs/omarchy.md) 4.0.4 runs too, in an Arch instance, with its own installer script.
+[Omarchy](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/omarchy.md) 4.0.4 runs too, in an Arch instance, with its own installer script.
 
 Other Arch-based and Debian/Ubuntu-based distros may work, since the installer goes by package
 family, but only the ones above were tried. Ubuntu 24.04 should behave like Mint 22.3 (same base)
 and is untested. Fedora and openSUSE are not supported yet.
+
+How to install each of them, from nothing: the [guides on the Operating-Systems branch](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Operating-Systems).
 
 ## Requirements
 
@@ -66,9 +78,6 @@ The installer:
 - builds a patched copy of aquamarine, in the version the distro ships, into `/opt/hyprland-wsl`
   (the system package is untouched)
 - installs the `hyprland-wsl` launcher into `/usr/local/bin`
-- makes `hyprland-wsl` a command in Windows terminals too, which opens a
-  [menu of your distros](#a-menu-of-your-distros) (`HYPRLAND_WSL_WINDOWS_COMMAND=0 ./install.sh`
-  skips this)
 - writes a default Hyprland config if there is none, with ALT as the main modifier and foot as
   the terminal
 
@@ -120,8 +129,8 @@ side instead. It starts the session and shows it with a VNC viewer that runs on 
 full screen, with the keyboard captured:
 
 ```powershell
-hyprland-wsl -Distro <distro>                           # full screen, from any Windows terminal
-.\windows\hyprland-wsl.cmd -Distro <distro>              # the same, from the checkout
+.\windows\hyprland-wsl.cmd -Distro <distro>              # full screen, keyboard captured
+hyprland-wsl -Distro <distro>                           # the same, with the launcher installed (any terminal)
 .\windows\hyprland-wsl.cmd -Distro <distro> -Windowed    # in a window
 .\windows\hyprland-wsl.cmd -Distro <distro> -Native      # full screen, every pixel rendered
 .\windows\hyprland-wsl.cmd -Distro <distro> -Software    # draw on the CPU
@@ -146,57 +155,9 @@ hyprland-wsl set-mod SUPER       # back with: hyprland-wsl set-mod ALT
 
 ### A menu of your distros
 
-Type `hyprland-wsl` in any Windows terminal (PowerShell, cmd, Windows Terminal). It opens a
-menu that lists every WSL distro, shows which ones have hyprland-wsl and what they render on,
-and starts the one you pick:
-
-```powershell
-hyprland-wsl
-```
-
-`install.sh` and `install-omarchy.ps1` set the command up; without them, run
-`.\windows\install-command.ps1` once (it adds `%LOCALAPPDATA%\hyprland-wsl\bin` to your user
-PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu without it.
-
-| Key | Action |
-| --- | --- |
-| Enter | start full screen (on a distro without hyprland-wsl: offer to install it) |
-| Ctrl+W | start in a window |
-| Ctrl+T | stop the distro |
-| Ctrl+D | remove the distro completely (asks you to type its name first; see below) |
-| Ctrl+R | rescan every distro |
-| Esc | close |
-
-The top row, **+ New distro**, installs a new one with Hyprland. Pick Arch Linux, CachyOS, Kali
-Linux, Ubuntu 26.04 or Linux Mint 22.3, then fill in a short form: name, folder for its disk,
-user name, password, hostname, main key (SUPER or ALT), whether it becomes WSL's default distro,
-and whether to start it when done. The user gets sudo with that password. CachyOS and Mint come
-from their Docker images (see [Distros without a WSL image](#distros-without-a-wsl-image)); for
-Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks nothing: it
-installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
-Omarchy's own setup.
-
-New distros get their folder under `C:\WSL` unless the `HYPRLAND_WSL_DISTROS` environment
-variable names another place, for example a separate drive:
-`[Environment]::SetEnvironmentVariable('HYPRLAND_WSL_DISTROS', 'P:\WSL', 'User')`.
-
-Removing a distro deletes its disk (`wsl --unregister`), its folder when nothing else is in it,
-its Windows Terminal profiles (the one WSL made and any you made yourself that start it with
-`-d NAME`, `--distribution NAME` or `-Distro NAME`), and the Microsoft Store app it came from, if
-any. The menu lists all of it before you confirm. Terminal's settings are backed up to
-`%LOCALAPPDATA%\hyprland-wsl\backups` first. Without the menu: `.\windows\remove-distro.ps1 -Name NAME`.
-emove-distro.ps1 -Name NAME`.
-
-The same works without the menu:
-
-```powershell
-.\windows\new-distro.ps1 -Distro arch -Name myarch -User me -Hostname myarch   # asks for the password
-```
-
-The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and
-`winget install junegunn.fzf`). It looks at each distro once, by starting it, and remembers the
-answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours follow the current
-BetterHotkeys theme when that is installed, and Omarchy's Hackerman otherwise.
+The [launcher](https://github.com/ItsOverk1ll/hyprland-wsl/tree/Launcher) adds a menu for Windows: type `hyprland-wsl` in any terminal, or
+press Win+Shift+H with [BetterHotkeys](https://github.com/ItsOverk1ll/BetterHotkeys), to start,
+create and remove distros. It lives on its own branch and installs with one line; see its README.
 
 Default keys (the installed config uses ALT as the main modifier, because the WSLg window
 cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
@@ -212,38 +173,10 @@ cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):
 
 ## Distros without a WSL image
 
-CachyOS and Linux Mint are not in `wsl --list --online`. Both publish Docker images, and a Docker
-image's filesystem can be imported into WSL without Docker. `tools/` has two helpers for that.
-
-**CachyOS** (one layer, imports directly), from PowerShell in a clone of this repo:
-
-```powershell
-.\tools\Get-DockerRootfs.ps1 -Image cachyos/cachyos -OutDir C:\WSL\images\cachyos
-wsl --import CachyOS C:\WSL\CachyOS C:\WSL\images\cachyos\layer01.tar.gz
-```
-
-**Linux Mint 22.3** (several layers, which have to be flattened inside any existing WSL distro):
-
-```powershell
-.\tools\Get-DockerRootfs.ps1 -Image linuxmintd/mint22.3-amd64 -OutDir C:\WSL\images\mint
-wsl -u root -- bash tools/merge-layers.sh /mnt/c/WSL/images/mint /mnt/c/WSL/images/mint/rootfs.tar.gz
-wsl --import Mint C:\WSL\Mint C:\WSL\images\mint\rootfs.tar.gz
-```
-
-Mint's image is its package build environment and still identifies as Ubuntu. Installing Mint's
-base packages turns it into a system that identifies as Linux Mint (run inside the new distro):
-
-```sh
-apt-get update
-apt-get install -y --allow-downgrades base-files=$(apt-cache madison base-files | awk '/mint/ {print $3; exit}') \
-    mintsystem mintsources mint-mirrors
-```
-
-This gives Mint's package base, not the Cinnamon desktop of an installed Mint. The
-`mint23-amd64` image on Docker Hub is a pre-release whose package repository does not exist yet;
-use 22.3.
-
-Put the distro on an SSD. On a hard disk, package installation inside WSL is many times slower.
+CachyOS and Linux Mint are not in `wsl --list --online`. Both publish Docker images, which can be
+imported into WSL without Docker: `tools/Get-DockerRootfs.ps1` downloads an image's layers and
+`tools/merge-layers.sh` merges several into one. The [CachyOS](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/cachyos.md) and
+[Linux Mint](https://github.com/ItsOverk1ll/hyprland-wsl/blob/Operating-Systems/mint.md) guides walk through it; the launcher does it for you.
 
 ## How it works
 
@@ -306,4 +239,4 @@ The frame rate at TigerVNC's own viewer has not been measured; that viewer does 
 ```
 
 Removes the launcher and the patched library. Packages, the user and `~/.config/hypr` stay.
-The Windows command is removed with `.\windows\install-command.ps1 -Remove`.
+The launcher, if you installed it, has its own uninstaller (see its README).
