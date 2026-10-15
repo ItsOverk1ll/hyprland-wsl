@@ -133,7 +133,6 @@ loginctl enable-linger "$U"
 # The packages just installed replaced systemd under the running one; without this the user's
 # session cannot be started until the instance is restarted.
 systemctl daemon-reexec
-systemctl restart dbus-broker.service > /dev/null 2>&1 || true
 systemctl start "user@$(id -u "$U").service"
 for _ in $(seq 50); do [ -S "/run/user/$(id -u "$U")/bus" ] && break; sleep 0.2; done
 if [ ! -S "/run/user/$(id -u "$U")/bus" ]; then
@@ -158,6 +157,21 @@ sudo -u "$U" mkdir -p "/home/$U/.config/environment.d"
 echo 'UWSM_APP_UNIT_TYPE=service' | sudo -u "$U" tee "/home/$U/.config/environment.d/50-hyprland-wsl.conf" > /dev/null
 systemctl restart "user@$(id -u "$U").service"
 for _ in $(seq 50); do [ -S "/run/user/$(id -u "$U")/bus" ] && break; sleep 0.2; done
+# Omarchy's Power Off and Restart call systemctl as the user. That normally needs an active
+# login session, which a session started by hyprland-wsl is not, so they were refused
+# ("interactive authentication required") and nothing happened. Allowed for the desktop's
+# users here; under WSL both end the instance (WSL does not restart it).
+cat > /etc/polkit-1/rules.d/50-hyprland-wsl-power.rules <<'EOF'
+// hyprland-wsl: the session is not started through a login manager, so logind does not
+// count it as an active local session, and power off and reboot would ask for a password
+// that no prompt can show. Let the desktop's users do both, as on a normal login.
+polkit.addRule(function (action, subject) {
+    if (/^org\.freedesktop\.login1\.(power-off|reboot)(-multiple-sessions|-ignore-inhibit)?$/.test(action.id) &&
+        subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});
+EOF
 # "wsl -d <instance>" should open as the user, not as root.
 if ! grep -q '^\[user\]' /etc/wsl.conf 2>/dev/null; then
     printf '\n[user]\ndefault=%s\n' "$U" >> /etc/wsl.conf

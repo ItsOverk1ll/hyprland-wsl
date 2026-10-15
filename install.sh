@@ -185,6 +185,9 @@ fi
 
 step "Installing the launcher"
 install -m 755 "$HERE/hyprland-wsl" /usr/local/bin/hyprland-wsl
+mkdir -p $PREFIX/lib
+cc -shared -fPIC -O2 -o $PREFIX/lib/no-cursor-image.so "$HERE/src/no-cursor-image.c" -ldl ||
+    echo "warning: could not build no-cursor-image.so; the Windows viewer may show a square on the pointer"
 echo "HYPR_USER=$U" > $CONF
 
 step "Preparing the Hyprland config"

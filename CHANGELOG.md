@@ -2,6 +2,33 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: Power Off, and the pointer square
+
+### Fixed
+
+- **Omarchy's Power Off did nothing.** The session is not a login session, so the system asked
+  for a password nothing could show. It now shuts the instance down, the viewer closes, and
+  the Windows launcher no longer starts the stopped instance again on its way out.
+- **Apps and Power Off in Omarchy after the instance restarted.** The user's systemd session
+  can fail to start with a WSL instance ("Device or resource busy"); the launcher now starts
+  it when it is configured and missing.
+- **The square on the pointer in the Windows viewer.** Measured on Windows: the old setting
+  gave a 24x24 solid black cursor, the dot setting a 5x5 dot. wayvnc now sends a one-pixel
+  pointer instead (`src/no-cursor-image.c`), on every distro including Mint's and Ubuntu's
+  older wayvnc. One black pixel remains at the tip of Hyprland's pointer.
+- **Rerunning the Omarchy script on a running instance** restarted the system message bus,
+  after which logind stopped answering until the instance was restarted.
+
+### Checked
+
+- Omarchy's screensaver starts after the idle time with the Windows viewer connected and no
+  input (tested with the timeout shortened to 20 seconds; Omarchy's own default is 150).
+
+### Added
+
+- `dev-log/scripts/Measure-ViewerCursor.ps1`: reads the cursor Windows shows over the viewer.
+- The viewer closes when the session ends from inside (`-ReconnectOnError=0`).
+
 ## 2026-10-13: Omarchy
 
 ### Added

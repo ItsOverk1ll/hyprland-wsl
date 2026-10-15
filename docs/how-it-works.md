@@ -107,6 +107,11 @@ wayvnc shares Hyprland's screen over VNC, on localhost only, and feeds keyboard 
 into Hyprland as virtual input devices. The launcher lets it send up to 60 frames a second
 (`--fps`).
 
+The pointer is drawn into the picture by Hyprland. wayvnc would also send the viewer a
+separate pointer image, which Hyprland leaves fully transparent for its themed pointers and
+which TigerVNC's Windows viewer then shows as a black square. A small library loaded into
+wayvnc (`src/no-cursor-image.c`) replaces it with a single black pixel at the pointer's tip.
+
 There are two ways to look at it:
 
 - **The WSLg window.** By default the launcher starts TigerVNC's viewer inside WSL. It is an X11

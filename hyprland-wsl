@@ -91,6 +91,16 @@ H=$(getent passwd "$U" | cut -d: -f6)
 R=/run/user/$(id -u "$U")
 pgrep -u "$U" -x Hyprland >/dev/null && die "Hyprland is already running for $U"
 
+# Where the user is set to keep a systemd session without logging in ("linger", as the Omarchy
+# setup does), that session should be running before Hyprland starts: apps, power off and the
+# like go through it. Under WSL it can fail to start with the instance ("Failed to spawn
+# executor: Device or resource busy"), and then it is started here.
+if [ -e "/var/lib/systemd/linger/$U" ] && [ -d /run/systemd/system ]; then
+    systemctl is-active --quiet "user@$(id -u "$U").service" ||
+        systemctl start "user@$(id -u "$U").service" ||
+        echo "hyprland-wsl: the user's systemd session did not start; apps launched through it will not open" >&2
+fi
+
 # A DRM device for buffer allocation. Hyprland is pointed at its primary node, because
 # vgem refuses to allocate through its render node.
 modprobe vgem || die "could not load the vgem kernel module"
@@ -240,7 +250,12 @@ fi
 # Hyprland never names its socket wayland-0.
 # wayvnc gets the same driver as Hyprland. Older wayvnc versions capture into GPU buffers of
 # their own, and Hyprland can only fill those if both sides use the same driver.
-as WAYLAND_DISPLAY=wayland-1 $DRIVER wayvnc --max-fps="$FPS" ${HYPRLAND_WSL_WAYVNC_OPTS:-} 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
+# The pointer is drawn into the picture by Hyprland. no-cursor-image.so keeps wayvnc from also
+# sending the viewer a pointer image, which Hyprland leaves transparent and which TigerVNC's
+# Windows viewer shows as a black square (src/no-cursor-image.c).
+PRELOAD=
+[ -f "$PREFIX/lib/no-cursor-image.so" ] && PRELOAD="LD_PRELOAD=$PREFIX/lib/no-cursor-image.so"
+as WAYLAND_DISPLAY=wayland-1 $DRIVER $PRELOAD HYPRLAND_WSL_POINTER_IMAGE=${HYPRLAND_WSL_POINTER_IMAGE:-0}     wayvnc --max-fps="$FPS" ${HYPRLAND_WSL_WAYVNC_OPTS:-} 127.0.0.1 "$PORT" > $LOG/wayvnc.log 2>&1 &
 wait_for test -S "$R/wayvncctl" || die "wayvnc did not start, see $LOG/wayvnc.log"
 # Say what is really drawing: the Direct3D 12 libraries are loaded only if that driver came up.
 HPID=$(pgrep -u "$U" -x Hyprland | head -n 1)

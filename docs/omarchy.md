@@ -54,6 +54,13 @@ unless a full-screen viewer captures the keyboard, so start it with the Windows-
 | Super+K | list of key bindings |
 | Ctrl+Alt+Enter | leave or enter full screen (the viewer's key, not Omarchy's) |
 
+**Power Off** in Omarchy's system menu shuts the instance down: the session ends, the viewer
+closes, and `wsl -l -v` shows the instance as stopped. **Restart** does the same, since WSL does
+not start an instance again by itself; start it again with the launcher. **Lock** and the
+**screensaver** work as in Omarchy: the screensaver starts after 150 seconds without keyboard
+or mouse input, the lock screen after 300 (it asks for the user's password). Both times are
+in `~/.config/omarchy/shell.json` under `idle`.
+
 Everything else is in [Omarchy's manual](https://github.com/basecamp/omarchy/tree/dev/manual).
 
 Update with `omarchy update`. Omarchy blocks a direct `pacman -Syu` on purpose.
@@ -84,6 +91,7 @@ system setup and per-user setup. The script does the last three:
 | Apps are started as services of the user's systemd session (`UWSM_APP_UNIT_TYPE=service` in `~/.config/environment.d/`) | Omarchy starts apps through uwsm, which normally moves each new process into the session. That move is refused when Hyprland was not started from inside the session, and then nothing opens. |
 | Chromium runs with `--disable-gpu` (`~/.config/chromium-flags.conf`) | It asks the GPU driver for a kind of buffer Mesa's Direct3D 12 driver does not hand out, and exits. Pages are drawn on the CPU; Hyprland still composes on the GPU. |
 | The file index (`locate`) skips `/mnt` | Otherwise it would index every Windows drive. |
+| Power off and reboot are allowed for the user without a password (`/etc/polkit-1/rules.d/50-hyprland-wsl-power.rules`) | The session is not a login session, so the system would ask for a password that nothing can prompt for, and Omarchy's Power Off did nothing. |
 
 Omarchy does not know about any of this. Its own tools for these areas (snapshots, the boot
 menu, hardware setup, factory reset, the drive password) will not work and should be left
@@ -92,10 +100,12 @@ alone.
 ## Known gaps
 
 - Tested: start-up on the GPU, the bar, wallpaper, notifications, the terminal, the Omarchy
-  menu, the key-binding list, the file manager, Chromium. Not gone through: every menu entry,
-  audio, the lock screen, the screensaver, `omarchy update`, theme switching.
-- Nobody has used it by hand yet.
+  menu, the key-binding list, the file manager, Chromium, the screensaver (by script, with the
+  timeout shortened), Power Off through the Windows launcher. Not gone through: every menu
+  entry, audio, the lock screen, `omarchy update`, theme switching.
+- Used by hand by the owner on 2026-10-15.
 - On first start a "Setup Wi-Fi" notice appears. There is no Wi-Fi to set up; WSL shares
   Windows' connection.
 - Bluetooth, Wi-Fi and power settings in the shell have nothing to talk to.
-- The pointer has a small dot at its tip in the Windows viewer, as on the other distros.
+- The pointer has a one-pixel dot at its tip in the Windows viewer, as on the other distros
+  (see troubleshooting: the alternatives are a black square or a second, Windows pointer).

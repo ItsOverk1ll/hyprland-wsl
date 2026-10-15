@@ -29,7 +29,7 @@ Ubuntu 26.04 passes the same checks from a clean install, with lower frame rates
 
 | Gap | Notes |
 | --- | --- |
-| Pointer in the Windows viewer | The server sends a fully transparent pointer image (Hyprland only shares pointers that an app set itself), and Windows shows that as a black square. The launcher asks the viewer for its dot cursor instead, so there is a small dot at the pointer's tip. Whether that looks acceptable was not confirmed. |
+| Pointer in the Windows viewer | Hyprland draws the pointer into the picture and shares only a transparent pointer image, which Windows draws as a black square. A small library loaded into wayvnc sends a one-pixel pointer instead, so one black pixel remains at the tip. Gone entirely only with a viewer of our own, or if Hyprland shared its themed pointers. |
 | Slower with many tiles | Reported by the owner on Kali at 2560x1440; not measured. wayvnc encodes on one thread and is the first suspect. |
 | Frame rate at TigerVNC's viewer | Not measured: neither the Windows nor the Linux viewer reports one, and the Windows one would not close on request. While it was connected, wayvnc used about two thirds of one core at 1920x1080 with the whole screen changing. |
 | Windows key capture is unconfirmed | As before: needs a real keyboard. |

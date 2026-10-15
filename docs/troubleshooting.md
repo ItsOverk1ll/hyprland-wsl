@@ -106,10 +106,14 @@ a VNC client on Windows to `127.0.0.1:5900`.
 Seen in GPU mode with Mesa 25.2 (Linux Mint 22.3 as shipped): Hyprland runs and takes input, and
 no picture arrives. Upgrade Mesa (see Installing) or start with `--software`.
 
-**A black square sits on the mouse pointer (Windows viewer)**
-The server sends the viewer a pointer image that is fully transparent, and Windows draws such a
-cursor as a black square. The current `windows\hyprland-wsl.ps1` asks the viewer for its dot
-cursor instead; update the clone. What remains is a small dot at the pointer's tip.
+**A black square or a dot sits on the mouse pointer (Windows viewer)**
+Hyprland draws the pointer into the picture, and wayvnc also sends the viewer a pointer image,
+which Hyprland leaves fully transparent. Windows draws a cursor with no visible pixel as an
+opaque black square. Current installs load a small library into wayvnc
+(`/opt/hyprland-wsl/lib/no-cursor-image.so`, from `src/no-cursor-image.c`) that sends a
+single black pixel at the pointer's tip instead, which sits on the tip of the pointer Hyprland
+draws. Rerun `./install.sh` to get it. Sending no image at all is worse: the viewer then shows
+the Windows arrow.
 
 **Chromium, or an app built on it, does not open in GPU mode**
 It asks the GPU driver for a kind of buffer that Mesa's Direct3D 12 driver does not hand out
@@ -135,6 +139,13 @@ The main modifier plus M ends the session, which also closes the viewer.
 **A key does not do what you expect**
 The installed config is Hyprland's default one: main modifier plus Q opens a terminal, C closes
 the window, M exits, V toggles floating. Change them in `~/.config/hypr/hyprland.lua`.
+
+**Omarchy's Power Off does nothing**
+Fixed in current installs. The session is not started through a login manager, so the system
+refused power off without a password that nothing could ask for. `tools/omarchy-wsl.sh` adds
+a permission rule for it (`/etc/polkit-1/rules.d/50-hyprland-wsl-power.rules`), and the
+launcher makes sure the user's systemd session is running, which Omarchy's Power Off goes
+through. Rerun the script, or copy the rule from it.
 
 **`sudo` asks for a password that does not exist**
 The user the installer creates has no password and is not in the sudo group. From Windows:

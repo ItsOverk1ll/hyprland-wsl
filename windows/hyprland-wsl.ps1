@@ -100,16 +100,24 @@ try {
     }
     if (-not $up) { throw "Hyprland did not come up. Run 'hyprland-wsl --no-viewer' inside the distro to see why." }
 
-    $viewerArgs = @('-RemoteResize=0', '-FullscreenSystemKeys=1')
-    # Hyprland draws the pointer into the picture, and the server sends the viewer a pointer image
-    # that is fully transparent. Windows shows such a cursor as a black square. Asking the viewer
-    # for its dot cursor instead leaves only a small dot at the pointer's tip.
+    # ReconnectOnError=0: when the session ends from inside (Omarchy's Power Off, the exit key),
+    # the viewer closes instead of offering to reconnect.
+    $viewerArgs = @('-RemoteResize=0', '-FullscreenSystemKeys=1', '-ReconnectOnError=0')
+    # The pointer is drawn into the picture by Hyprland, and the launcher sends the viewer a
+    # one-pixel pointer image (src/no-cursor-image.c). Installs from before that send a fully
+    # transparent one, which Windows shows as a black square; the dot cursor covers that case.
     if ([IO.File]::ReadAllText($viewer, [Text.Encoding]::ASCII).Contains('AlwaysCursor')) { $viewerArgs += '-AlwaysCursor=1', '-CursorType=Dot' }
     if (-not $Windowed) { $viewerArgs += '-FullScreen=1' }
     $viewerArgs += "127.0.0.1::$Port"
     Start-Process $viewer -ArgumentList $viewerArgs -Wait
 }
 finally {
-    # Ending Hyprland makes the launcher inside WSL shut the rest down.
-    & wsl.exe @wsl pkill -x Hyprland 2>$null | Out-Null
+    # Closing the viewer leaves the session running, so it is ended here; Hyprland's end makes
+    # the launcher inside WSL shut the rest down. When the session ended from inside instead
+    # (the exit key, or Omarchy's Power Off, which stops the whole instance), the session's
+    # wsl.exe ends at about the same time as the viewer, and nothing more is done: a wsl.exe
+    # call naming an instance that is shutting down would start it again.
+    if ($session -and -not $session.WaitForExit(4000)) {
+        & wsl.exe @wsl pkill -x Hyprland 2>$null | Out-Null
+    }
 }
