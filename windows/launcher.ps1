@@ -2,8 +2,11 @@
 # current Omarchy theme). Enter starts the selected distro's Hyprland full screen.
 #
 #   Enter      start full screen          Ctrl+W   start in a window
-#   Ctrl+T     stop the distro            Ctrl+R   rescan every distro
-#   Esc        close
+#   Ctrl+T     stop the distro            Ctrl+D   remove (unregister) the distro
+#   Ctrl+R     rescan every distro        Esc      close
+#
+# The top row, "+ New distro", creates one: Arch, CachyOS, Kali, Ubuntu or Mint with the account,
+# hostname and so on asked for here (new-distro.ps1), or Omarchy, which asks in its own setup.
 #
 # What it knows about each distro (installed, user, versions) is read once by starting the
 # distro and kept in %LOCALAPPDATA%\hyprland-wsl\distros.json; Ctrl+R refreshes it.
@@ -105,12 +108,12 @@ function Update-Cache($cache, $distros, [switch]$All) {
 function Write-Preview($n, $d, $i) {
     $lines = @()
     if (-not $d) {
-        $lines += "${accent}New Omarchy instance$reset", '',
-            'A new Arch Linux instance with',
-            'Omarchy installed. Its first start',
-            "opens Omarchy's own setup: keyboard,",
-            'account, hostname and timezone.', '',
-            "${dim}About 10 minutes and 11 GB.$reset"
+        $lines += "${accent}New distro$reset", '',
+            'Install a new WSL distro with',
+            'Hyprland: Arch Linux, CachyOS, Kali,',
+            'Ubuntu, Linux Mint or Omarchy.', '',
+            "${dim}You choose the name, account,$reset",
+            "${dim}password and hostname next.$reset"
     } else {
         $state = if ($d.State -eq 'Running') { "${accent}running$reset" } else { "${dim}stopped$reset" }
         $lines += "$bright$($d.Name)$reset  $state$(if ($d.Default) { "  ${dim}(default)$reset" })", ''
@@ -157,18 +160,127 @@ function Install-HyprlandWsl($d, $info) {
     Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null
 }
 
-function New-OmarchyInstance($distros) {
+# A name not taken yet: base, base2, base3, ...
+function Get-FreeName($base, $distros) {
+    $n = 1; while ("$base$(if ($n -gt 1) { $n })" -in $distros.Name) { $n++ }
+    "$base$(if ($n -gt 1) { $n })"
+}
+
+# One line of the form: the label, the default in brackets, Enter keeps it. Asks again until
+# $valid (a regex) matches.
+function Read-Field($label, $default, $valid, $hint) {
+    while ($true) {
+        Write-Host "  ${accent}$($label.PadRight(10))$reset$(if ($default) { " ${dim}[$default]$reset" })${accent} >$reset " -NoNewline
+        $v = [Console]::ReadLine().Trim()
+        if (-not $v) { $v = $default }
+        if ($v -and (-not $valid -or $v -cmatch $valid)) { return $v }
+        Write-Host "  ${warn}$hint$reset"
+    }
+}
+
+function Read-YesNo($label, [bool]$default) {
+    $v = Read-Field $label $(if ($default) { 'Y/n' } else { 'y/N' }) $null ''
+    if ($v -in 'Y/n', 'y/N') { return $default }
+    $v -match '^y'
+}
+
+$newDistros = [ordered]@{
+    arch    = @('Arch Linux',      'From WSL''s own catalogue. Rolling', 'release, the newest Hyprland.')
+    cachyos = @('CachyOS',         'Arch-based, with optimised packages.', 'Downloaded from its Docker image.')
+    kali    = @('Kali Linux',      'From WSL''s own catalogue. Debian-', 'based, rolling.')
+    ubuntu  = @('Ubuntu 26.04',    'From WSL''s own catalogue. An older', 'Hyprland (0.53) than the others.')
+    mint    = @('Linux Mint 22.3', 'From its Docker image. Hyprland', 'comes from a third-party PPA.')
+    omarchy = @('Omarchy',         'Arch with Omarchy, the desktop by', 'DHH. Asks for its account and', 'the rest in its own setup screens.')
+}
+
+# Sets $script:made to the new distro's name when it should be started. Called as a statement,
+# not for its output: capturing it would take the terminal away from install.sh's questions.
+function New-Distro($distros) {
+    $script:made = $null
+    $rows = foreach ($k in $newDistros.Keys) {
+        $t = $newDistros[$k]
+        $lines = @("$accent$($t[0])$reset", '') + $t[1..($t.Count - 1)]
+        Set-Content (Join-Path $previewDir "new-$k.txt") ($lines -join "`n") -Encoding utf8NoBOM
+        "$bright$($t[0])$reset`tnew-$k"
+    }
+    Push-Location $previewDir
+    try {
+        $pick = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 `
+            --preview='type {2}.txt' --preview-window='right,50%,border-left,wrap' `
+            --border-label=' New distro ' --header='Enter choose · Esc back'
+    } finally { Pop-Location }
+    if (-not $pick) { return }
+    $kind = ($pick -split "`t")[-1] -replace '^new-', ''
+    $title = $newDistros[$kind][0]
     Clear-Host
-    Write-Host "`n  ${accent}New Omarchy instance$reset  ${dim}(leave the name empty to cancel)$reset`n"
-    $n = 1; while ("omarchy$(if ($n -gt 1) { $n })" -in $distros.Name) { $n++ }
-    $suggest = "omarchy$(if ($n -gt 1) { $n })"
-    Write-Host "  ${accent}Name$reset ${dim}[$suggest]$reset${accent} >$reset " -NoNewline
-    $name = [Console]::ReadLine().Trim(); if (-not $name) { $name = $suggest }
-    if ($name -notmatch '^[A-Za-z0-9._-]+$') { Write-Host "  Letters, digits, dots, dashes and underscores only."; Start-Sleep 2; return }
-    $where = "C:\WSL\$name"
-    Write-Host "  ${accent}Folder$reset ${dim}[$where]$reset${accent} >$reset " -NoNewline
-    $folder = [Console]::ReadLine().Trim(); if (-not $folder) { $folder = $where }
-    & pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'install-omarchy.ps1') -Name $name -Location $folder
+
+    if ($kind -eq 'omarchy') {
+        $name = Get-FreeName 'omarchy' $distros
+        Write-Host "`n  ${accent}New Omarchy instance '$name'$reset ${dim}in C:\WSL\$name$reset`n"
+        & pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'install-omarchy.ps1') -Name $name -Location "C:\WSL\$name"
+        return
+    }
+
+    Write-Host "`n  ${accent}New $title$reset  ${dim}Enter keeps the value in brackets. Ctrl+C closes the menu.$reset`n"
+    $name = Read-Field 'Name' (Get-FreeName $kind $distros) '^[A-Za-z0-9._-]+$' 'Letters, digits, dots, dashes and underscores.'
+    if ($name -in $distros.Name) { Write-Host "  ${warn}'$name' exists already.$reset"; Start-Sleep 2; return }
+    $folder = Read-Field 'Folder' "C:\WSL\$name" $null ''
+    $me = ($env:USERNAME.ToLower() -replace '[^a-z0-9_-]', '')
+    if ($me -notmatch '^[a-z_]') { $me = 'user' }
+    $user = Read-Field 'User' $me '^(?!root$)[a-z_][a-z0-9_-]{0,31}$' 'Lower case letters, digits, - and _, starting with a letter.'
+    while ($true) {
+        Write-Host "  ${accent}$('Password'.PadRight(10))$reset${accent} >$reset " -NoNewline
+        $pw = Read-Host -AsSecureString
+        Write-Host "  ${accent}$('Again'.PadRight(10))$reset${accent} >$reset " -NoNewline
+        $pw2 = Read-Host -AsSecureString
+        $a = [Net.NetworkCredential]::new('', $pw).Password; $b = [Net.NetworkCredential]::new('', $pw2).Password
+        if (-not $a) { Write-Host "  ${warn}The password cannot be empty.$reset"; continue }
+        if ($a -cne $b) { Write-Host "  ${warn}They differ; once more.$reset"; continue }
+        break
+    }
+    $hostname = Read-Field 'Hostname' ($name -replace '[^A-Za-z0-9-]', '-') '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$' 'Letters, digits and dashes.'
+    $mod = (Read-Field 'Main key' 'SUPER' '^(?i)(super|alt)$' 'SUPER (the Windows key) or ALT.').ToUpper()
+    $default = Read-YesNo 'Default' $false
+    $ppa = $false
+    if ($kind -eq 'mint') {
+        Write-Host "  ${dim}Mint has no Hyprland package: it comes from ppa:cppiber/hyprland, and a newer$reset"
+        Write-Host "  ${dim}Mesa (for the GPU) from ppa:kisak/kisak-mesa. Neither is part of Mint.$reset"
+        $ppa = Read-YesNo 'Use PPAs' $true
+        if (-not $ppa) { Write-Host "  ${warn}Without them install.sh asks again, and Hyprland cannot be installed.$reset" }
+    }
+    $start = Read-YesNo 'Start it' $true
+
+    Write-Host "`n  ${bright}$title '$name'$reset ${dim}in $folder, user $user, hostname $hostname, main key $mod$(if ($default) { ', default distro' })$reset"
+    if (-not (Read-YesNo 'Create' $true)) { return }
+
+    $params = @{ Distro = $kind; Name = $name; Location = $folder; User = $user; Password = $pw
+                 Hostname = $hostname; Mod = $mod; SetDefault = $default; AllowPpa = $ppa }
+    try {
+        & (Join-Path $PSScriptRoot 'new-distro.ps1') @params
+    } catch {
+        Write-Host "`n  ${warn}$($_.Exception.Message)$reset"
+        Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null
+        return
+    }
+    if ($start) { $script:made = $name; return }
+    Write-Host "`n  ${dim}Press Enter to go back$reset"; [Console]::ReadLine() | Out-Null
+}
+
+function Remove-Distro($d) {
+    Clear-Host
+    $key = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss |
+        Where-Object { (Get-ItemProperty $_.PSPath).DistributionName -eq $d.Name } | Select-Object -First 1
+    $base = if ($key) { (Get-ItemProperty $key.PSPath).BasePath -replace '^\\\\\?\\', '' }
+    Write-Host "`n  ${warn}Remove $($d.Name)?$reset"
+    Write-Host "  ${dim}This unregisters it: its disk$(if ($base) { " in $base" }) and everything in it$reset"
+    Write-Host "  ${dim}are deleted for good. Type the name to confirm, or Enter to keep it.$reset`n"
+    Write-Host "  ${accent}Name$reset${accent} >$reset " -NoNewline
+    if ([Console]::ReadLine().Trim() -cne $d.Name) { return $false }
+    wsl.exe --unregister $d.Name | Out-Host
+    # wsl leaves the folder; remove it when nothing else is in it.
+    if ($base -and (Test-Path $base) -and -not (Get-ChildItem $base -Force)) { Remove-Item $base }
+    Start-Sleep 1
+    $true
 }
 
 $cache = Read-Cache
@@ -178,7 +290,7 @@ Update-Cache $cache $distros
 while ($true) {
     $distros = @(Get-Distros)
     Clear-Host
-    $rows = @("$accent+ New Omarchy instance$reset`t0")
+    $rows = @("$accent+ New distro$reset`t0")
     Write-Preview 0 $null $null
     $i = 1
     foreach ($d in $distros) {
@@ -196,21 +308,29 @@ while ($true) {
 
     Push-Location $previewDir
     try {
-        $out = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 --expect='ctrl-w,ctrl-t,ctrl-r' `
+        $out = $rows | & $fzf @fzfStyle --delimiter="`t" --with-nth=1 --expect='ctrl-w,ctrl-t,ctrl-d,ctrl-r' `
             --preview='type {2}.txt' --preview-window='right,40%,border-left,wrap' `
             --border-label=' Hyprland on WSL ' `
-            --header='Enter start · Ctrl+W windowed · Ctrl+T stop · Ctrl+R rescan'
+            --header="Enter start · Ctrl+W windowed · Ctrl+T stop`nCtrl+D remove · Ctrl+R rescan · Esc close"
     } finally { Pop-Location }
     if (-not $out) { exit 0 }
     $key, $row = @($out)
     if ($key -eq 'ctrl-r') { Clear-Host; Update-Cache $cache $distros -All; continue }
     if (-not $row) { continue }
     $index = [int]($row -split "`t")[-1]
-    if ($index -eq 0) { New-OmarchyInstance $distros; $cache = Read-Cache; Update-Cache $cache @(Get-Distros); continue }
+    if ($index -eq 0) {
+        if ($key) { continue }
+        New-Distro $distros
+        $distros = @(Get-Distros)
+        Update-Cache $cache $distros
+        if ($made) { Start-Distro ($distros | Where-Object Name -eq $made) $cache[$made] }
+        continue
+    }
 
     $d = $distros[$index - 1]
     $info = $cache[$d.Name]
     if ($key -eq 'ctrl-t') { wsl.exe -t $d.Name | Out-Null; continue }
+    if ($key -eq 'ctrl-d') { if (Remove-Distro $d) { $cache.Remove($d.Name); Save-Cache $cache }; continue }
     if (-not $info.installed) {
         if ($info.family) { Install-HyprlandWsl $d $info; $cache[$d.Name] = Get-DistroInfo $d.Name; Save-Cache $cache }
         continue

@@ -163,14 +163,29 @@ PATH; `-Remove` takes it away). `.\windows\launcher.cmd` opens the same menu wit
 | Enter | start full screen (on a distro without hyprland-wsl: offer to install it) |
 | Ctrl+W | start in a window |
 | Ctrl+T | stop the distro |
+| Ctrl+D | remove the distro (`wsl --unregister`; asks you to type its name first) |
 | Ctrl+R | rescan every distro |
 | Esc | close |
 
-The top row, **+ New Omarchy instance**, runs `install-omarchy.ps1` with a name and folder you
-choose. The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and `winget install junegunn.fzf`). It looks at each distro once, by
-starting it, and remembers the answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours
-follow the current BetterHotkeys theme when that is installed,
-and Omarchy's Hackerman otherwise.
+The top row, **+ New distro**, installs a new one with Hyprland. Pick Arch Linux, CachyOS, Kali
+Linux, Ubuntu 26.04 or Linux Mint 22.3, then fill in a short form: name, folder for its disk,
+user name, password, hostname, main key (SUPER or ALT), whether it becomes WSL's default distro,
+and whether to start it when done. The user gets sudo with that password. CachyOS and Mint come
+from their Docker images (see [Distros without a WSL image](#distros-without-a-wsl-image)); for
+Mint the form also asks about the two PPAs it needs. Picking **Omarchy** asks nothing: it
+installs into the next free name (`omarchy`, `omarchy2`, ...) under `C:\WSL` and opens
+Omarchy's own setup.
+
+The same works without the menu:
+
+```powershell
+.\windows\new-distro.ps1 -Distro arch -Name myarch -User me -Hostname myarch   # asks for the password
+```
+
+The menu needs PowerShell 7 and fzf (`winget install Microsoft.PowerShell` and
+`winget install junegunn.fzf`). It looks at each distro once, by starting it, and remembers the
+answer in `%LOCALAPPDATA%\hyprland-wsl\distros.json`. Its colours follow the current
+BetterHotkeys theme when that is installed, and Omarchy's Hackerman otherwise.
 
 Default keys (the installed config uses ALT as the main modifier, because the WSLg window
 cannot pass the Windows key; with `set-mod SUPER` read ALT as the Windows key):

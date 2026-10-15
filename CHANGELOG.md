@@ -2,6 +2,21 @@
 
 What changed, newest first. The project has no version numbers yet, so entries go by date.
 
+## 2026-10-15: New and removed distros from the menu
+
+### Added
+
+- **+ New distro** in the menu: Arch Linux, CachyOS, Kali Linux, Ubuntu 26.04 or Linux Mint
+  22.3, with a form for the name, folder, user, password, hostname, main key, default distro
+  and starting it when done. It creates the distro (from WSL's catalogue, or from the Docker
+  image for CachyOS and Mint, merging Mint's layers in a temporary distro), makes the account
+  with sudo, sets the hostname and default user, runs install.sh, and skips the distro's own
+  first-run account prompt. Omarchy goes straight to its installer and its own setup.
+- `windows\new-distro.ps1`, the same from the command line, and `tools/new-distro-setup.sh`,
+  the part that runs inside the new distro.
+- **Ctrl+D** in the menu removes a distro (`wsl --unregister`, after typing its name), and
+  its folder when nothing else is in it.
+
 ## 2026-10-15: A launcher menu
 
 ### Added
