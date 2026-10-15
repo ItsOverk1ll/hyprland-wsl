@@ -10,7 +10,9 @@
 # PowerShell 7 handling comes from BetterHotkeys' installer, which was tested on fresh Windows 10
 # and 11 installs (https://github.com/ItsOverk1ll/BetterHotkeys).
 # For testing: HYPRLAND_WSL_SOURCE=<folder> copies hyprland-wsl from that folder instead of
-# downloading it, and HYPRLAND_WSL_NO_GIT=1 downloads the zip even where git is installed.
+# downloading it, HYPRLAND_WSL_NO_GIT=1 downloads the zip even where git is installed, and
+# HYPRLAND_WSL_SKIP_VIRT=1 carries on without virtualization (a virtual machine that cannot
+# have it: everything installs, but WSL 2 distros will not start).
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -206,7 +208,9 @@ function Invoke-Wsl([string[]] $wslArgs) {
 # installed, so that nobody restarts for nothing.
 $computer = Get-CimInstance Win32_ComputerSystem
 $firmware = (Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled
-if (-not $computer.HypervisorPresent -and -not $firmware) {
+if (-not $computer.HypervisorPresent -and -not $firmware -and $env:HYPRLAND_WSL_SKIP_VIRT) {
+    Say 'Virtualization is off; carrying on anyway (HYPRLAND_WSL_SKIP_VIRT is set). WSL 2 distros will not start here.' Yellow
+} elseif (-not $computer.HypervisorPresent -and -not $firmware) {
     if ("$($computer.Manufacturer) $($computer.Model)" -match 'VirtualBox|VMware|Virtual Machine|QEMU|KVM|Parallels') {
         Stop-Here "This Windows runs in a virtual machine ($($computer.Model)) without nested virtualization, which WSL 2 needs. Shut the virtual machine down and turn it on in its settings (VirtualBox: Settings > System > Processor > Enable Nested VT-x/AMD-V; VMware: Virtualize Intel VT-x/EPT), then run this again."
     }
